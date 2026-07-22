@@ -1,10 +1,10 @@
 import type { RawAudio } from "@huggingface/transformers";
 import { loadJapaneseG2P, type JapaneseG2PConfig } from "./g2p/japanese.js";
 import { loadKokoro, speakEnglish, speakJapanese, type LoadOptions } from "./kokoro/synthesize.js";
-import { DEFAULT_VOICE_ID, resolveVoice, VOICES, type VoiceEntry } from "./voices.js";
+import { DEFAULT_VOICE_ID, resolveLang, type Lang } from "./voices.js";
 
-export { VOICES, DEFAULT_VOICE_ID, resolveVoice };
-export type { VoiceEntry, JapaneseG2PConfig, LoadOptions };
+export { DEFAULT_VOICE_ID, resolveLang };
+export type { Lang, JapaneseG2PConfig, LoadOptions };
 
 // Official upstream asset locations. Fetched at runtime (not bundled), same
 // pattern kokoro-js itself uses for the ONNX model (Hugging Face Hub, cached
@@ -36,17 +36,18 @@ export class KokoroJP {
   }
 
   /**
-   * Synthesize speech for `text` using the given voiceId (see `VOICES`).
-   * Language (en/ja) is inferred from the voiceId.
+   * Synthesize speech for `text` using the given Kokoro-82M voiceId (e.g.
+   * "af_heart", "jf_alpha" — see `resolveLang`). Language (en/ja) is
+   * inferred from the voiceId's prefix.
    */
   async speak(text: string, voiceId: string = DEFAULT_VOICE_ID, speed = 1): Promise<RawAudio> {
-    const voice = resolveVoice(voiceId);
-    if (!voice) {
-      throw new Error(`unsupported voiceId: ${voiceId}. Should be one of: ${Object.keys(VOICES).join(", ")}`);
+    const lang = resolveLang(voiceId);
+    if (lang === "ja") {
+      return speakJapanese(this.tts, text, voiceId, speed);
     }
-    if (voice.lang === "ja") {
-      return speakJapanese(this.tts, text, voice.kokoroVoice, speed);
+    if (lang === "en") {
+      return speakEnglish(this.tts, text, voiceId, speed);
     }
-    return speakEnglish(this.tts, text, voice.kokoroVoice, speed);
+    throw new Error(`unsupported voiceId: ${voiceId}. Expected an English (af_*/am_*/bf_*/bm_*) or Japanese (jf_*/jm_*) Kokoro-82M voice id.`);
   }
 }

@@ -30,13 +30,16 @@ const tts = await KokoroJP.load({
   },
 });
 
-const englishAudio = await tts.speak("Hello, world.", "Joanna");
-const japaneseAudio = await tts.speak("こんにちは", "Takumi");
+const englishAudio = await tts.speak("Hello, world.", "af_heart");
+const japaneseAudio = await tts.speak("こんにちは", "jf_alpha");
 ```
 
-ボイスID(`src/voices.ts`参照)は、このライブラリの元々の利用元(OLMS Client)が
-既に使っているAmazon PollyのvoiceIdと名前を合わせてある。そのため既存UIの
-ボイス選択部分を変更せずに使える。
+voiceIdはkokoro-js本体と同じ、素のKokoro-82M voice id(例: `af_heart`, `jf_alpha`)をそのまま使う。
+別名レイヤーは持たない。1文字目が言語、2文字目が性別を表す(`af_` = 米語・女性、`jm_` = 日本語・男性、等)。
+このパッケージが実際にend-to-endで対応しているのは英語(`af_`/`am_`/`bf_`/`bm_`、kokoro-js本体の
+espeak-ngフォニマイザーが処理)と日本語(`jf_`/`jm_`、このパッケージ独自のOpen JTalk g2pが処理)の
+2言語のみ。Kokoro-82Mモデル自体は他言語(`e`西語/`f`仏語/`h`ヒンディー語/`i`伊語/`p`ポルトガル語/`z`中国語)
+のvoiceも同梱しているが、対応するg2pが無いため`resolveLang()`は`undefined`を返し`speak()`は例外を投げる。
 
 ## スクリプト
 
