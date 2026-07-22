@@ -1,0 +1,45 @@
+{
+  "name": "kokoro-js-jp",
+  "version": "0.1.0",
+  "description": "Browser-based English + Japanese TTS: openjtalkjs (Open JTalk G2P) + kokoro-js (Kokoro-82M synthesis via transformers.js/ONNX). No server or container required.",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --clean && node scripts/copy-vendor.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["tts", "text-to-speech", "kokoro", "japanese", "open-jtalk", "browser", "wasm"],
+  "author": "nerosui",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nerosui/kokoro-js-jp.git"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^3.5.1",
+    "kokoro-js": "^1.2.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
