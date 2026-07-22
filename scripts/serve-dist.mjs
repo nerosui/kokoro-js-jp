@@ -19,6 +19,8 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { rollup } from "rollup";
+import { nodeResolve } from "@rollup/plugin-node-resolve";
 
 const rootDir = path.resolve(fileURLToPath(import.meta.url), "../..");
 const distDir = path.join(rootDir, "dist");
@@ -27,6 +29,19 @@ const fixturesDir = path.join(rootDir, "test/e2e/fixtures");
 const VENDOR_FILES = {
   "/vendor/kokoro-js.web.js": path.join(rootDir, "node_modules/kokoro-js/dist/kokoro.web.js"),
 };
+
+// Bundle the package through the same public `exports` entry an installed
+// consumer resolves. This catches asset-URL and top-level side-effect bugs
+// that importing dist/index.js directly cannot reproduce.
+const consumerEntry = path.join(rootDir, "test/e2e/fixtures/consumer-entry.js");
+const consumerBundle = await rollup({
+  input: consumerEntry,
+  external: ["kokoro-js", "@huggingface/transformers"],
+  plugins: [nodeResolve({ browser: true })],
+});
+const consumerOutput = await consumerBundle.generate({ format: "esm" });
+await consumerBundle.close();
+const consumerCode = Buffer.from(consumerOutput.output[0].code);
 
 const MIME_TYPES = {
   ".js": "text/javascript; charset=utf-8",
@@ -47,6 +62,7 @@ async function readIfExists(dir, urlPath) {
 }
 
 async function readVendorFile(urlPath) {
+  if (urlPath === "/consumer.js") return consumerCode;
   const filePath = VENDOR_FILES[urlPath];
   if (!filePath) return null;
   try {

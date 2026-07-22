@@ -6,6 +6,9 @@
     "types": "./dist/index.d.ts",
     "default": "./dist/index.js"
   },
+  "bin": {
+    "kokoro-js-jp-copy-assets": "./scripts/copy-assets.mjs"
+  },
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "node scripts/build.mjs",
@@ -48,7 +51,8 @@
     "dist",
     "README.md",
     "LICENSE",
-    "THIRD_PARTY_NOTICES.md"
+    "THIRD_PARTY_NOTICES.md",
+    "scripts/copy-assets.mjs"
   ],
   "homepage": "https://github.com/nerosui/kokoro-js-jp",
   "repository": {

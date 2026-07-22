@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// src/g2p/japanese.ts talks to the vendored openjtalkjs worker wrapper only
-// through `configure()`/`runFrontendAsync()`. Mocking that module lets us
+// src/g2p/japanese.ts talks to the lazy worker client only through
+// `configureWorker()`/`runFrontendAsync()`. Mocking that module lets us
 // exercise the module-global config-tracking/race-guard logic in
 // loadJapaneseG2P() without a real browser Worker + WASM engine.
 const configureMock = vi.fn();
-vi.mock("../src/vendor/openjtalk/browser.js", () => ({
-  configure: (...args: unknown[]) => configureMock(...args),
+vi.mock("../src/g2p/worker-client.js", () => ({
+  configureWorker: (...args: unknown[]) => configureMock(...args),
   runFrontendAsync: vi.fn(),
 }));
 
-const CONFIG_A = { dicUrl: "https://a.example/dic", voiceUrl: "https://a.example/voice.htsvoice" };
-const CONFIG_B = { dicUrl: "https://b.example/dic", voiceUrl: "https://b.example/voice.htsvoice" };
+const CONFIG_A = { assetsUrl: "https://a.example/assets" };
+const CONFIG_B = { assetsUrl: "https://b.example/assets" };
 
 function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -65,13 +65,25 @@ describe("loadJapaneseG2P", () => {
     expect(configureMock).toHaveBeenCalledTimes(1);
   });
 
+  it("resolves an origin-root assetsUrl without producing double slashes", async () => {
+    configureMock.mockResolvedValue(undefined);
+    const { loadJapaneseG2P } = await import("../src/g2p/japanese.js");
+
+    await loadJapaneseG2P({ assetsUrl: "/" });
+
+    expect(configureMock).toHaveBeenCalledWith("/browser/worker.js", {
+      dicUrl: "/openjtalk-dic",
+      voiceUrl: "/openjtalk-voice.htsvoice",
+    });
+  });
+
   it("rejects a call with a different config while the first is still in flight", async () => {
     const gate = deferred<void>();
     configureMock.mockReturnValue(gate.promise);
     const { loadJapaneseG2P } = await import("../src/g2p/japanese.js");
 
     const first = loadJapaneseG2P(CONFIG_A);
-    await expect(loadJapaneseG2P(CONFIG_B)).rejects.toThrow(/different dicUrl\/voiceUrl/);
+    await expect(loadJapaneseG2P(CONFIG_B)).rejects.toThrow(/different asset URLs/);
 
     gate.resolve();
     await first;
@@ -83,7 +95,7 @@ describe("loadJapaneseG2P", () => {
     const { loadJapaneseG2P } = await import("../src/g2p/japanese.js");
 
     await loadJapaneseG2P(CONFIG_A);
-    await expect(loadJapaneseG2P(CONFIG_B)).rejects.toThrow(/different dicUrl\/voiceUrl/);
+    await expect(loadJapaneseG2P(CONFIG_B)).rejects.toThrow(/different asset URLs/);
   });
 
   it("allows a retry with the same config after a prefetch failure (before configure() was ever sent)", async () => {
@@ -98,6 +110,10 @@ describe("loadJapaneseG2P", () => {
     await expect(loadJapaneseG2P(CONFIG_A)).rejects.toThrow("network error");
     await expect(loadJapaneseG2P(CONFIG_A)).resolves.toBeUndefined();
     expect(configureMock).toHaveBeenCalledTimes(1);
+    expect(configureMock).toHaveBeenCalledWith("https://a.example/assets/browser/worker.js", {
+      dicUrl: "https://a.example/assets/openjtalk-dic",
+      voiceUrl: "https://a.example/assets/openjtalk-voice.htsvoice",
+    });
   });
 
   it("does not retry (and never sends a second configure()) once configure() itself has been dispatched and failed", async () => {
@@ -137,5 +153,20 @@ describe("loadJapaneseG2P", () => {
   it("throws from japaneseTextToPhonemes if loadJapaneseG2P was never called", async () => {
     const { japaneseTextToPhonemes } = await import("../src/g2p/japanese.js");
     await expect(japaneseTextToPhonemes("こんにちは")).rejects.toThrow(/loadJapaneseG2P\(\) must be called/);
+  });
+});
+
+describe("browser-only initialization", () => {
+  it("can import the public entry in Node without constructing a Worker", async () => {
+    vi.stubGlobal(
+      "Worker",
+      class {
+        constructor() {
+          throw new Error("Worker must remain lazy");
+        }
+      },
+    );
+    await expect(import("../src/index.js")).resolves.toBeDefined();
+    vi.unstubAllGlobals();
   });
 });

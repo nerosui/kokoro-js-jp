@@ -21,7 +21,7 @@ file only adds agent-specific judgment calls.
 ## When it fails: where to actually look
 
 - **Dictionary/voice reachability test fails**: don't touch the e2e test. Check
-  `DEFAULT_DIC_URL`/`DEFAULT_VOICE_URL` in `src/index.ts` and whether
+  the `assetsUrl` mapping in `src/g2p/japanese.ts`, `scripts/copy-assets.mjs`, and whether
   `scripts/fetch-openjtalk-dic-assets.mjs` actually populated `dist/openjtalk-dic/` with
   all 8 files (`sys.dic`, `matrix.bin`, `char.bin`, `unk.dic`, `left-id.def`,
   `right-id.def`, `pos-id.def`, `rewrite.def`) — a partial/failed fetch is the most likely
@@ -50,8 +50,8 @@ re-running the full suite each time:
 2. `browser_navigate` to `http://localhost:4173/index.html`.
 3. `browser_eval` to run snippets directly, e.g.:
    ```js
-   const { KokoroJP } = await import("/index.js");
-   const tts = await KokoroJP.load({ dtype: "q4" });
+   const { KokoroJP } = await import("/consumer.js");
+   const tts = await KokoroJP.load({ dtype: "q4", japanese: { assetsUrl: "/" } });
    const audio = await tts.speak("こんにちは", "jf_alpha");
    [audio.audio.length, audio.sampling_rate];
    ```

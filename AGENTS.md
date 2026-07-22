@@ -37,10 +37,10 @@ current setup, not a bug to "fix" by adding retries or shortening timeouts.
 `test/e2e/tts.spec.ts`:
 
 1. **Dictionary/voice reachability** (fast, no browser page needed) — a direct regression
-   test for the dicUrl bug: `dist/openjtalk-dic/` must serve 8 individual files
+   test for the asset-layout bug: `dist/openjtalk-dic/` must serve 8 individual files
    (`${dicUrl}/sys.dic`, `${dicUrl}/matrix.bin`, ...), not an archive. If this fails, don't
-   look further — check `DEFAULT_DIC_URL`/`DEFAULT_VOICE_URL` in `src/index.ts` and
-   `scripts/fetch-openjtalk-dic-assets.mjs` first.
+   look further — check the `assetsUrl` mapping in `src/g2p/japanese.ts`,
+   `scripts/copy-assets.mjs`, and `scripts/fetch-openjtalk-dic-assets.mjs` first.
 2. **Full pipeline** — one `page.evaluate()`, one `KokoroJP.load()` (kept to one to avoid
    re-downloading the model 3x in one run): English synthesis via kokoro-js's own
    phonemizer, Japanese synthesis via this package's Open JTalk g2p (Worker + WASM), and an
@@ -62,10 +62,10 @@ there, not in the Playwright assertion message.
 ### The bare-specifier gotcha
 
 `dist/index.js` has `import ... from "kokoro-js"` — left as a bare external import on
-purpose (`rollup.config.js`'s `external: [...]`; a real consumer's bundler resolves that
-from `node_modules`). A raw browser can't resolve bare specifiers with no bundler, so
-`test/e2e/fixtures/index.html` maps `"kokoro-js"` to `/vendor/kokoro-js.web.js` via an
-import map — `scripts/serve-dist.mjs` serves that file straight from
+purpose (`rollup.config.js`'s `external: [...]`). The e2e server first bundles the package
+through its public npm entry as `/consumer.js`; kokoro-js remains external so the raw browser
+maps it to `/vendor/kokoro-js.web.js` via the import map in `test/e2e/fixtures/index.html`.
+`scripts/serve-dist.mjs` serves that file straight from
 `node_modules/kokoro-js/dist/kokoro.web.js`, kokoro-js's own dependency-free browser
 build (the one it publishes for jsdelivr/unpkg `<script type="module">` use). If you add a
 new bare import to `src/`, either keep it external and add it to both the import map in
