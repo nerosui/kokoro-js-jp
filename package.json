@@ -7,7 +7,7 @@
     "default": "./dist/index.js"
   },
   "scripts": {
-    "build": "rm -rf dist && rollup -c && node scripts/copy-vendor.mjs",
+    "build": "rm -rf dist && rollup -c && node scripts/copy-vendor.mjs && node scripts/fetch-openjtalk-dic-assets.mjs",
     "format": "prettier --write . --print-width 1000",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"

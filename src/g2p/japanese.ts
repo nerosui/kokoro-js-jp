@@ -11,9 +11,21 @@ import { configure, runFrontendAsync, type NJDNode } from "../vendor/openjtalk/b
 import { hiraganaWordToPhonemes, PUNCT } from "./hepburn.js";
 
 export type JapaneseG2PConfig = {
-  /** URL to the Open JTalk dictionary directory (must contain sys.dic, matrix.bin, etc.) */
+  /**
+   * URL to a *directory* serving the 8 individual Open JTalk dictionary
+   * files (sys.dic, matrix.bin, char.bin, unk.dic, left-id.def, right-id.def,
+   * pos-id.def, rewrite.def) — openjtalkjs's browser runtime fetches each
+   * one separately as `${dicUrl}/<file>`. Not an archive URL.
+   */
   dicUrl: string;
-  /** URL to an .htsvoice file. Only used by openjtalkjs internally to size buffers; we don't use its synthesize(). */
+  /**
+   * URL to a single .htsvoice file. This package never calls openjtalkjs's
+   * `synthesize()` (only `runFrontendAsync()` for g2p), but openjtalkjs's
+   * native `configure()` still hard-requires a loadable voice — it calls
+   * `HTS_Engine_load()` unconditionally and fails configure() entirely if
+   * that fails — so a valid voiceUrl is required even though the voice
+   * model itself is otherwise unused here.
+   */
   voiceUrl: string;
 };
 

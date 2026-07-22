@@ -6,11 +6,15 @@ import { DEFAULT_VOICE_ID, resolveLang, type Lang } from "./voices.js";
 export { DEFAULT_VOICE_ID, resolveLang };
 export type { Lang, JapaneseG2PConfig, LoadOptions };
 
-// Official upstream asset locations. Fetched at runtime (not bundled), same
-// pattern kokoro-js itself uses for the ONNX model (Hugging Face Hub, cached
-// via the browser Cache Storage API). See THIRD_PARTY_NOTICES.md.
-export const DEFAULT_DIC_URL = "https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz";
-export const DEFAULT_VOICE_URL = "https://raw.githubusercontent.com/r9y9/pyopenjtalk/master/pyopenjtalk/htsvoice/mei_normal.htsvoice";
+// The Open JTalk dictionary + default HTS voice are vendored into dist/ at
+// build time (see scripts/fetch-openjtalk-dic-assets.mjs) and served
+// relative to this module, so KokoroJP.load() works with zero config and no
+// runtime dependency on any third-party host. dicUrl is a *directory*
+// openjtalkjs's browser runtime fetches 8 individual files from
+// (`${dicUrl}/sys.dic`, `${dicUrl}/matrix.bin`, ...), not an archive.
+// See THIRD_PARTY_NOTICES.md for the dictionary/voice licenses.
+export const DEFAULT_DIC_URL = new URL("./openjtalk-dic", import.meta.url).href;
+export const DEFAULT_VOICE_URL = new URL("./openjtalk-voice.htsvoice", import.meta.url).href;
 
 export type KokoroJPOptions = LoadOptions & {
   japanese?: Partial<JapaneseG2PConfig>;
@@ -22,17 +26,28 @@ export type KokoroJPOptions = LoadOptions & {
  * no server or container required.
  */
 export class KokoroJP {
-  private constructor(private readonly tts: Awaited<ReturnType<typeof loadKokoro>>) {}
+  private japaneseG2PPromise: Promise<void> | null = null;
+
+  private constructor(
+    private readonly tts: Awaited<ReturnType<typeof loadKokoro>>,
+    private readonly japaneseConfig: JapaneseG2PConfig,
+  ) {}
 
   static async load(options: KokoroJPOptions = {}): Promise<KokoroJP> {
-    const [tts] = await Promise.all([
-      loadKokoro(options),
-      loadJapaneseG2P({
-        dicUrl: options.japanese?.dicUrl ?? DEFAULT_DIC_URL,
-        voiceUrl: options.japanese?.voiceUrl ?? DEFAULT_VOICE_URL,
-      }),
-    ]);
-    return new KokoroJP(tts);
+    const tts = await loadKokoro(options);
+    return new KokoroJP(tts, {
+      dicUrl: options.japanese?.dicUrl ?? DEFAULT_DIC_URL,
+      voiceUrl: options.japanese?.voiceUrl ?? DEFAULT_VOICE_URL,
+    });
+  }
+
+  // Lazy: the Open JTalk dictionary is ~100MB, so English-only callers
+  // shouldn't pay to fetch it. Loaded once, on first Japanese speak() call.
+  private loadJapaneseG2POnce(): Promise<void> {
+    if (!this.japaneseG2PPromise) {
+      this.japaneseG2PPromise = loadJapaneseG2P(this.japaneseConfig);
+    }
+    return this.japaneseG2PPromise;
   }
 
   /**
@@ -43,6 +58,7 @@ export class KokoroJP {
   async speak(text: string, voiceId: string = DEFAULT_VOICE_ID, speed = 1): Promise<RawAudio> {
     const lang = resolveLang(voiceId);
     if (lang === "ja") {
+      await this.loadJapaneseG2POnce();
       return speakJapanese(this.tts, text, voiceId, speed);
     }
     if (lang === "en") {

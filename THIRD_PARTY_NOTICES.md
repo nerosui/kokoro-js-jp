@@ -35,10 +35,28 @@ That package's `install` script builds a native Node addon via `node-gyp`, which
 for (and would otherwise be a broken/unnecessary native-toolchain requirement imposed on) this
 browser-only library — so only the four static, browser-safe output files are vendored here
 rather than depending on the npm package directly. See [BSD-3-Clause (openjtalkjs)](#bsd-3-clause-openjtalkjs)
-below. `openjtalkjs` itself wraps [Open JTalk](http://open-jtalk.sourceforge.net/) / HTS Engine /
-MeCab / the NAIST Japanese Dictionary (see its own `THIRD_PARTY_NOTICES.md` for those components'
-licenses); this package does not separately reproduce those, since it consumes openjtalkjs only
-as a prebuilt WASM binary, not as source.
+below.
+
+## Open JTalk dictionary (fetched at build time into dist/openjtalk-dic/, see scripts/fetch-openjtalk-dic-assets.mjs)
+
+The 8 dictionary files openjtalkjs's g2p runtime reads at startup (`sys.dic`, `matrix.bin`,
+`char.bin`, `unk.dic`, `left-id.def`, `right-id.def`, `pos-id.def`, `rewrite.def`), from
+[`open_jtalk_dic_utf_8-1.11.tar.gz`](https://github.com/r9y9/open_jtalk/releases/tag/v1.11.1)
+(also the exact tarball `openjtalkjs` itself downloads for its own demos/tests). Three
+Modified-BSD copyright notices apply, all bundled in the tarball's own `COPYING` file (also
+copied to `dist/openjtalk-dic/COPYING`): NAIST Japanese Dictionary (Copyright (c) 2009, Nara
+Institute of Science and Technology), UniDic (Copyright (c) 2011-2017, The UniDic Consortium),
+and Open JTalk itself (Copyright (c) 2008-2016, Nagoya Institute of Technology / HTS Working
+Group). See [Modified BSD (Open JTalk dictionary)](#modified-bsd-open-jtalk-dictionary) below.
+
+## mei_normal.htsvoice (fetched at build time into dist/openjtalk-voice.htsvoice, same script)
+
+The default HTS voice openjtalkjs's `configure()` loads (required for it to succeed at all,
+even though this package never calls `synthesize()` — see `src/g2p/japanese.ts`), from
+[pyopenjtalk](https://github.com/r9y9/pyopenjtalk/blob/master/pyopenjtalk/htsvoice/mei_normal.htsvoice)
+(same URL `openjtalkjs` itself uses). "Mei" HTS voice, Copyright (c) 2009-2013 Nagoya Institute
+of Technology / [MMDAgent Project](http://www.mmdagent.jp/). Creative Commons Attribution 3.0.
+See [CC BY 3.0 (mei_normal.htsvoice)](#cc-by-30-mei_normalhtsvoice) below.
 
 ---
 
@@ -281,4 +299,161 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+## Modified BSD (Open JTalk dictionary)
+
+Reproduced verbatim from `COPYING` inside `open_jtalk_dic_utf_8-1.11.tar.gz` (also present at
+`dist/openjtalk-dic/COPYING` in this package) — three notices covering the dictionary's lineage.
+
+```
+Copyright (c) 2009, Nara Institute of Science and Technology, Japan.
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+Redistributions of source code must retain the above copyright notice,
+this list of conditions and the following disclaimer.
+Redistributions in binary form must reproduce the above copyright
+notice, this list of conditions and the following disclaimer in the
+documentation and/or other materials provided with the distribution.
+Neither the name of the Nara Institute of Science and Technology
+(NAIST) nor the names of its contributors may be used to endorse or
+promote products derived from this software without specific prior
+written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+Copyright (c) 2011-2017, The UniDic Consortium
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+ * Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+
+ * Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the
+   distribution.
+
+ * Neither the name of the UniDic Consortium nor the names of its
+   contributors may be used to endorse or promote products derived
+   from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+/* ----------------------------------------------------------------- */
+/*           The Japanese TTS System "Open JTalk"                    */
+/*           developed by HTS Working Group                          */
+/*           http://open-jtalk.sourceforge.net/                      */
+/* ----------------------------------------------------------------- */
+/*                                                                   */
+/*  Copyright (c) 2008-2016  Nagoya Institute of Technology          */
+/*                           Department of Computer Science          */
+/*                                                                   */
+/* All rights reserved.                                              */
+/*                                                                   */
+/* Redistribution and use in source and binary forms, with or        */
+/* without modification, are permitted provided that the following   */
+/* conditions are met:                                               */
+/*                                                                   */
+/* - Redistributions of source code must retain the above copyright  */
+/*   notice, this list of conditions and the following disclaimer.   */
+/* - Redistributions in binary form must reproduce the above         */
+/*   copyright notice, this list of conditions and the following     */
+/*   disclaimer in the documentation and/or other materials provided */
+/*   with the distribution.                                          */
+/* - Neither the name of the HTS working group nor the names of its  */
+/*   contributors may be used to endorse or promote products derived */
+/*   from this software without specific prior written permission.   */
+/*                                                                   */
+/* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND            */
+/* CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,       */
+/* INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF          */
+/* MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE          */
+/* DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS */
+/* BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,          */
+/* EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED   */
+/* TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,     */
+/* DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON */
+/* ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,   */
+/* OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY    */
+/* OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE           */
+/* POSSIBILITY OF SUCH DAMAGE.                                       */
+/* ----------------------------------------------------------------- */
+```
+
+## CC BY 3.0 (mei_normal.htsvoice)
+
+Reproduced verbatim from `LICENSE_mei_normal.htsvoice` in
+[pyopenjtalk](https://github.com/r9y9/pyopenjtalk/blob/master/pyopenjtalk/htsvoice/LICENSE_mei_normal.htsvoice).
+
+```
+-----------------------------------------------------------------
+          HTS Voice "Mei"
+          released by MMDAgent Project Team
+          http://www.mmdagent.jp/
+-----------------------------------------------------------------
+
+ Copyright (c) 2009-2013  Nagoya Institute of Technology
+                          Department of Computer Science
+
+Some rights reserved.
+
+This work is licensed under the Creative Commons Attribution 3.0
+license.
+
+You are free:
+ * to Share - to copy, distribute and transmit the work
+ * to Remix - to adapt the work
+Under the following conditions:
+ * Attribution - You must attribute the work in the manner
+   specified by the author or licensor (but not in any way that
+   suggests that they endorse you or your use of the work).
+With the understanding that:
+ * Waiver - Any of the above conditions can be waived if you get
+   permission from the copyright holder.
+ * Public Domain - Where the work or any of its elements is in
+   the public domain under applicable law, that status is in no
+   way affected by the license.
+ * Other Rights - In no way are any of the following rights
+   affected by the license:
+    - Your fair dealing or fair use rights, or other applicable
+      copyright exceptions and limitations;
+    - The author's moral rights;
+    - Rights other persons may have either in the work itself or
+      in how the work is used, such as publicity or privacy
+      rights.
+ * Notice - For any reuse or distribution, you must make clear to
+   others the license terms of this work. The best way to do this
+   is with a link to this web page.
+
+See http://creativecommons.org/ for details.
+-----------------------------------------------------------------
 ```
