@@ -61,9 +61,12 @@ export class KokoroJP {
 
   // Lazy: the Open JTalk dictionary is ~100MB, so English-only callers
   // shouldn't pay to fetch it. Loaded once, on first Japanese speak() call.
-  // If loadJapaneseG2P() rejects (network error, etc.), we drop the cached
-  // promise so the next speak() call retries instead of replaying the same
-  // rejection forever.
+  // If loadJapaneseG2P() rejects, we drop this instance's cached promise so
+  // the next speak() call re-invokes it — but that only actually retries the
+  // underlying work if the failure happened before configure() was sent to
+  // the vendor worker (e.g. a prefetch network error); loadJapaneseG2P()
+  // itself stays permanently locked and replays the same rejection once
+  // configure() has actually been dispatched (see g2p/japanese.ts).
   private loadJapaneseG2POnce(): Promise<void> {
     if (!this.japaneseG2PPromise) {
       this.japaneseG2PPromise = loadJapaneseG2P(this.japaneseConfig).catch((err) => {

@@ -27,6 +27,21 @@ function okResponse() {
   return { ok: true, status: 200, body: null, arrayBuffer: async () => new ArrayBuffer(0) } as unknown as Response;
 }
 
+// Exercises the ReadableStreamDefaultReader path in drainResponseBody()
+// (the arrayBuffer() fallback above only covers environments without a
+// streamable Response.body).
+function streamingOkResponse(chunkCount = 3) {
+  let remaining = chunkCount;
+  const reader = {
+    read: vi.fn(async () => {
+      if (remaining <= 0) return { done: true, value: undefined };
+      remaining -= 1;
+      return { done: false, value: new Uint8Array([1, 2, 3]) };
+    }),
+  };
+  return { ok: true, status: 200, body: { getReader: () => reader } } as unknown as Response;
+}
+
 describe("loadJapaneseG2P", () => {
   beforeEach(() => {
     vi.resetModules();
@@ -97,6 +112,26 @@ describe("loadJapaneseG2P", () => {
     await expect(loadJapaneseG2P(CONFIG_A)).rejects.toThrow("worker request timed out");
     await expect(loadJapaneseG2P(CONFIG_A)).rejects.toThrow("worker request timed out");
     expect(configureMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("drains a streaming response body fully before configure() runs", async () => {
+    const responses = new Map<string, ReturnType<typeof streamingOkResponse>>();
+    const fetchMock = vi.fn(async (url: string) => {
+      const res = streamingOkResponse();
+      responses.set(url, res);
+      return res;
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    configureMock.mockResolvedValue(undefined);
+    const { loadJapaneseG2P } = await import("../src/g2p/japanese.js");
+
+    await loadJapaneseG2P(CONFIG_A);
+
+    expect(responses.size).toBe(9); // 8 dic files + voice file
+    for (const res of responses.values()) {
+      const reader = res.body?.getReader() as unknown as { read: ReturnType<typeof vi.fn> };
+      expect(reader.read).toHaveBeenCalled();
+    }
   });
 
   it("throws from japaneseTextToPhonemes if loadJapaneseG2P was never called", async () => {
