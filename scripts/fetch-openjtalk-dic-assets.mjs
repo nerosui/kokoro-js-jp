@@ -59,6 +59,7 @@ const cacheDir = path.join(rootDir, ".cache/openjtalk-assets");
 const cacheDicDir = path.join(cacheDir, "dic");
 const cacheVoiceFile = path.join(cacheDir, "voice.htsvoice");
 const markerFile = path.join(cacheDir, ".version");
+const manifestFile = path.join(cacheDir, ".checksums.json");
 
 const distDicDir = path.join(rootDir, "dist/openjtalk-dic");
 const distVoiceFile = path.join(rootDir, "dist/openjtalk-voice.htsvoice");
@@ -97,15 +98,41 @@ async function isNonEmptyFile(file) {
 // are present, not just sys.dic.
 const DIC_FILES = ["sys.dic", "matrix.bin", "char.bin", "unk.dic", "left-id.def", "right-id.def", "pos-id.def", "rewrite.def"];
 
+// There's no upstream-published per-file checksum for the 8 extracted
+// dictionary files (only the tarball as a whole, verified against DIC_SHA256
+// right after download). So once extraction succeeds, we compute our own
+// per-file hashes and persist them here, then re-verify every file against
+// this manifest on every run — including cache *hits* — so a truncated or
+// corrupted cache entry (e.g. from an interrupted CI cache restore) can't
+// silently make it into dist/.
+async function writeManifest() {
+  const entries = await Promise.all([...DIC_FILES.map(async (f) => [f, await sha256(path.join(cacheDicDir, f))]), sha256(cacheVoiceFile).then((h) => ["voice.htsvoice", h])]);
+  await fs.writeFile(manifestFile, JSON.stringify(Object.fromEntries(entries), null, 2), "utf8");
+}
+
+async function verifyManifest() {
+  const manifest = await fs
+    .readFile(manifestFile, "utf8")
+    .then(JSON.parse)
+    .catch(() => null);
+  if (!manifest) return false;
+  for (const f of DIC_FILES) {
+    const expected = manifest[f];
+    if (!expected || !(await isNonEmptyFile(path.join(cacheDicDir, f)))) return false;
+    if ((await sha256(path.join(cacheDicDir, f))) !== expected) return false;
+  }
+  if (!manifest["voice.htsvoice"] || !(await isNonEmptyFile(cacheVoiceFile))) return false;
+  return (await sha256(cacheVoiceFile)) === manifest["voice.htsvoice"];
+}
+
 async function ensureCache() {
   const versionOk = await fs
     .readFile(markerFile, "utf8")
     .then((v) => v.trim() === DIC_VERSION)
     .catch(() => false);
-  const dicFilesOk = versionOk ? (await Promise.all(DIC_FILES.map((f) => isNonEmptyFile(path.join(cacheDicDir, f))))).every(Boolean) : false;
-  const cached = versionOk && dicFilesOk && (await isNonEmptyFile(cacheVoiceFile));
+  const cached = versionOk && (await verifyManifest());
   if (cached) {
-    console.log("fetch-openjtalk-dic-assets: cache already populated, skipping download");
+    console.log("fetch-openjtalk-dic-assets: cache already populated and verified, skipping download");
     return;
   }
 
@@ -128,6 +155,7 @@ async function ensureCache() {
   if (!(await isNonEmptyFile(cacheVoiceFile))) throw new Error("Downloaded voice file is empty");
   await verifyChecksum(cacheVoiceFile, VOICE_SHA256, "HTS voice file");
 
+  await writeManifest();
   await fs.writeFile(markerFile, `${DIC_VERSION}\n`, "utf8");
 }
 

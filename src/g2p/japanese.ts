@@ -32,12 +32,19 @@ export type JapaneseG2PConfig = {
 // The underlying openjtalkjs worker (src/vendor/openjtalk/browser.js) owns a
 // single Worker + single WASM instance for the whole page — `configure()` is
 // process-global, not per-caller, no matter how many KokoroJP instances call
-// loadJapaneseG2P(). We track the config it was configured with so a second
-// call with a *different* dicUrl/voiceUrl fails loudly instead of silently
-// keeping the first config, and we memoize the in-flight promise so
-// concurrent first calls share one configure() instead of racing two.
+// loadJapaneseG2P(). `activeConfig` holds whichever config is either
+// in-flight or already configured, so a second call with a *different*
+// dicUrl/voiceUrl fails loudly (whether it arrives before or after the first
+// call finishes) instead of silently joining/keeping the first config. We
+// memoize the in-flight promise so concurrent calls with the *same* config
+// share one configure() instead of racing two.
+let activeConfig: JapaneseG2PConfig | null = null;
 let configuredWith: JapaneseG2PConfig | null = null;
 let configuringPromise: Promise<void> | null = null;
+
+function sameConfig(a: JapaneseG2PConfig, b: JapaneseG2PConfig): boolean {
+  return a.dicUrl === b.dicUrl && a.voiceUrl === b.voiceUrl;
+}
 
 // The 8 files openjtalkjs's worker-side configure() fetches from `dicUrl`
 // (see JapaneseG2PConfig doc above).
@@ -51,23 +58,29 @@ const DIC_FILES = ["sys.dic", "matrix.bin", "char.bin", "unk.dic", "left-id.def"
 // exceed 20s. A dedicated Worker shares the page's HTTP cache for
 // same-origin requests, so warming that cache here first (no timeout) means
 // the worker's own fetches resolve from cache almost instantly, keeping
-// configure() itself well inside the 20s budget.
+// configure() itself well inside the 20s budget. Crucially, we must consume
+// each response body (not just await the fetch() promise, which resolves as
+// soon as headers arrive) so this function doesn't return — and let
+// configure() proceed — before the ~100MB download has actually finished
+// landing in the HTTP cache.
 async function warmDictionaryCache(config: JapaneseG2PConfig): Promise<void> {
   const urls = [...DIC_FILES.map((f) => `${config.dicUrl}/${f}`), config.voiceUrl];
-  const responses = await Promise.all(urls.map((url) => fetch(url, { cache: "force-cache" })));
-  for (const [i, res] of responses.entries()) {
-    if (!res.ok) throw new Error(`failed to prefetch ${urls[i]}: HTTP ${res.status}`);
-  }
+  await Promise.all(
+    urls.map(async (url) => {
+      const res = await fetch(url, { cache: "force-cache" });
+      if (!res.ok) throw new Error(`failed to prefetch ${url}: HTTP ${res.status}`);
+      await res.arrayBuffer();
+    }),
+  );
 }
 
 export async function loadJapaneseG2P(config: JapaneseG2PConfig): Promise<void> {
-  if (configuredWith) {
-    if (configuredWith.dicUrl !== config.dicUrl || configuredWith.voiceUrl !== config.voiceUrl) {
-      throw new Error(`Japanese g2p is already configured with a different dicUrl/voiceUrl (dicUrl=${configuredWith.dicUrl}, voiceUrl=${configuredWith.voiceUrl}). ` + `openjtalkjs's browser runtime is a single global engine per page, so all callers must use the same japanese config.`);
-    }
-    return;
+  if (activeConfig && !sameConfig(activeConfig, config)) {
+    throw new Error(`Japanese g2p is already being configured or was already configured with a different dicUrl/voiceUrl (dicUrl=${activeConfig.dicUrl}, voiceUrl=${activeConfig.voiceUrl}). ` + `openjtalkjs's browser runtime is a single global engine per page, so all callers must use the same japanese config.`);
   }
+  if (configuredWith) return;
   if (!configuringPromise) {
+    activeConfig = config;
     configuringPromise = warmDictionaryCache(config)
       .then(() => configure(config))
       .then(
@@ -76,6 +89,7 @@ export async function loadJapaneseG2P(config: JapaneseG2PConfig): Promise<void> 
         },
         (err) => {
           configuringPromise = null;
+          activeConfig = null;
           throw err;
         },
       );
