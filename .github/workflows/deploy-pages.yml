@@ -1,0 +1,59 @@
+name: Deploy demo to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "demo/**"
+      - "src/**"
+      - "scripts/**"
+      - "rollup.config.js"
+      - "package.json"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+      - uses: actions/cache@v4
+        with:
+          path: .cache/openjtalk-assets
+          key: openjtalk-assets-${{ hashFiles('scripts/fetch-openjtalk-dic-assets.mjs') }}
+      - run: npm ci
+      # Builds dist/ (bundle + vendored openjtalkjs worker/WASM + the Open
+      # JTalk dictionary/voice, ~100MB) — same build the npm package ships,
+      # reused here so the demo runs the real thing, not a mock.
+      - run: npm run build
+      - name: Assemble site
+        run: |
+          mkdir -p _site
+          cp demo/index.html demo/style.css demo/main.js _site/
+          cp -r dist _site/dist
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

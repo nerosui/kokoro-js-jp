@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>kokoro-js-jp — ブラウザ完結の音声合成</title>
+    <meta name="description" content="サーバーもコンテナも使わず、ブラウザの中だけで動く英語・日本語のテキスト読み上げ。kokoro-js-jp のデモ。" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;600&family=Noto+Sans+JP:wght@400;500&display=swap" rel="stylesheet" />
+
+    <link rel="stylesheet" href="./style.css" />
+
+    <!-- dist/index.js (the built package, copied alongside this page — see
+         .github/workflows/deploy-pages.yml) has a bare `import ... from "kokoro-js"`,
+         left external on purpose (see THIRD_PARTY_NOTICES.md / README). A raw
+         browser page needs an import map to resolve it; a real consumer's
+         bundler would do this from node_modules instead. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "kokoro-js": "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <svg class="ensou" viewBox="0 0 200 200" aria-hidden="true">
+      <circle cx="100" cy="100" r="82" fill="none" stroke="currentColor" stroke-width="7" stroke-linecap="round" stroke-dasharray="486 45" transform="rotate(-104 100 100)" />
+    </svg>
+
+    <main class="card">
+      <header>
+        <h1><span class="kanji" aria-hidden="true">心</span>kokoro-js-jp</h1>
+        <p class="tagline">ブラウザの中だけで動く、英語・日本語の音声合成</p>
+      </header>
+
+      <section class="controls">
+        <label for="text">テキスト</label>
+        <textarea id="text" rows="4"></textarea>
+
+        <div class="row">
+          <div class="field">
+            <label for="lang">言語</label>
+            <select id="lang">
+              <option value="en">English</option>
+              <option value="ja">日本語</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="voice">声</label>
+            <select id="voice"></select>
+          </div>
+          <div class="field">
+            <label for="speed">速さ <span id="speedValue">1.0×</span></label>
+            <input type="range" id="speed" min="0.5" max="1.5" step="0.1" value="1" />
+          </div>
+        </div>
+
+        <button id="speak" disabled>読み上げる</button>
+        <p id="status" class="status" role="status">モデルを読み込み中…</p>
+        <audio id="player" controls hidden></audio>
+      </section>
+
+      <footer>
+        <a href="https://github.com/nerosui/kokoro-js-jp" target="_blank" rel="noopener">GitHub</a>
+        <span aria-hidden="true">·</span>
+        <span>Apache-2.0</span>
+        <span aria-hidden="true">·</span>
+        <span>全処理はこの端末内で完結し、テキストは外部送信されません</span>
+      </footer>
+    </main>
+
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>
