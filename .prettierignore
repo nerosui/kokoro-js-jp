@@ -1,0 +1,6 @@
+dist
+node_modules
+
+# byte-for-byte vendored copies from an upstream npm tarball (see
+# THIRD_PARTY_NOTICES.md) — must stay unformatted to preserve provenance.
+src/vendor/openjtalk

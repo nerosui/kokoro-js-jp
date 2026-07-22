@@ -1,43 +1,57 @@
 {
   "name": "kokoro-js-jp",
   "version": "0.1.0",
-  "description": "Browser-based English + Japanese TTS: openjtalkjs (Open JTalk G2P) + kokoro-js (Kokoro-82M synthesis via transformers.js/ONNX). No server or container required.",
   "type": "module",
-  "main": "dist/index.cjs",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    }
+    "types": "./dist/index.d.ts",
+    "default": "./dist/index.js"
   },
-  "files": [
-    "dist",
-    "LICENSE",
-    "THIRD_PARTY_NOTICES.md"
-  ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs --dts --clean && node scripts/copy-vendor.mjs",
+    "build": "rm -rf dist && rollup -c && node scripts/copy-vendor.mjs",
+    "format": "prettier --write . --print-width 1000",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": ["tts", "text-to-speech", "kokoro", "japanese", "open-jtalk", "browser", "wasm"],
-  "author": "nerosui",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/nerosui/kokoro-js-jp.git"
+  "keywords": [
+    "kokoro",
+    "tts",
+    "text-to-speech",
+    "japanese",
+    "open-jtalk",
+    "browser",
+    "wasm"
+  ],
+  "author": {
+    "name": "nerosui"
   },
+  "license": "Apache-2.0",
+  "description": "Browser-based English + Japanese TTS: kokoro-js (Kokoro-82M via transformers.js/ONNX) + openjtalkjs (Open JTalk G2P, WASM). No server or container required.",
   "dependencies": {
     "@huggingface/transformers": "^3.5.1",
     "kokoro-js": "^1.2.1"
   },
   "devDependencies": {
-    "tsup": "^8.5.1",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "@rollup/plugin-terser": "^1.0.0",
+    "@rollup/plugin-typescript": "^12.3.0",
+    "prettier": "^3.9.6",
+    "rollup": "^4.62.2",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "homepage": "https://github.com/nerosui/kokoro-js-jp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nerosui/kokoro-js-jp.git"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=20"

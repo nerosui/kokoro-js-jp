@@ -4,35 +4,41 @@ This package bundles or adapts code from the following third-party projects.
 
 ## kokoro-js (runtime dependency)
 
-https://github.com/hexgrad/kokoro-js — Apache License 2.0. See [Apache-2.0](#apache-license-20) below.
+[hexgrad/kokoro](https://github.com/hexgrad/kokoro) (published to npm as `kokoro-js`) —
+Apache License 2.0. See [Apache-2.0](#apache-license-20) below.
 
 ## @huggingface/transformers (transitive dependency of kokoro-js)
 
-https://github.com/huggingface/transformers.js — Apache License 2.0. See [Apache-2.0](#apache-license-20) below.
+[huggingface/transformers.js](https://github.com/huggingface/transformers.js) —
+Apache License 2.0. See [Apache-2.0](#apache-license-20) below.
 
 ## misaki (adapted, not bundled as a dependency)
 
-`src/g2p/hepburn.ts` ports the `HEPBURN` kana→IPA table and single-mora
-mapping algorithm from `misaki/cutlet.py`
-(https://github.com/hexgrad/misaki/blob/main/misaki/cutlet.py).
+`src/g2p/hepburn.ts` ports the `HEPBURN` kana→IPA table and single-mora mapping algorithm
+from [`misaki/cutlet.py`](https://github.com/hexgrad/misaki/blob/main/misaki/cutlet.py).
 Copyright hexgrad. Apache License 2.0. See [Apache-2.0](#apache-license-20) below.
 
 ## cutlet (adapted, not bundled as a dependency)
 
-`misaki/cutlet.py` is itself adapted from `cutlet/cutlet.py`
-(https://github.com/polm/cutlet). Copyright (c) 2020 Paul O'Leary McCann.
-MIT License. See [MIT (cutlet)](#mit-license-cutlet) below.
+`misaki/cutlet.py` is itself adapted from [`cutlet/cutlet.py`](https://github.com/polm/cutlet).
+Copyright (c) 2020 Paul O'Leary McCann. MIT License. See [MIT (cutlet)](#mit-license-cutlet) below.
 
-## openjtalkjs (vendored under src/vendor/openjtalk/)
+## openjtalkjs (vendored, browser/WASM build only, under src/vendor/openjtalk/)
 
-**TODO — unresolved:** the browser/WASM build vendored under
-`src/vendor/openjtalk/` does not carry an embedded license header or NOTICE
-file, and this notices file does not yet reproduce openjtalkjs's (or the
-underlying Open JTalk / HTS Engine / MeCab / NAIST Japanese Dictionary
-components it wraps) license text. Do not publish this package until the
-correct upstream license(s) and copyright holder(s) for openjtalkjs and its
-statically-linked components have been identified and their required notices
-added here.
+[keanu-thakalath/openjtalkjs](https://github.com/keanu-thakalath/openjtalkjs) — BSD 3-Clause
+License. The four files under `src/vendor/openjtalk/` (`browser.js`, `browser/worker.js`,
+`openjtalk-wasm-wrapper-D6E3BSJO.js`, `openjtalk-wasm.wasm`) are byte-for-byte copies of the
+prebuilt browser/WASM assets published in
+[`@keanu-thakalath/openjtalkjs@0.1.0`](https://www.npmjs.com/package/@keanu-thakalath/openjtalkjs)
+(verified against the published npm tarball; sha512 `Mud5msXc83++jes/DDDz4huDuo/KH5TeTwy4LhLKdSahdAwwCZ9CVu8KL2Kp7MOJBNR755R4vW4mpFaFEfUgKg==`).
+That package's `install` script builds a native Node addon via `node-gyp`, which is not needed
+for (and would otherwise be a broken/unnecessary native-toolchain requirement imposed on) this
+browser-only library — so only the four static, browser-safe output files are vendored here
+rather than depending on the npm package directly. See [BSD-3-Clause (openjtalkjs)](#bsd-3-clause-openjtalkjs)
+below. `openjtalkjs` itself wraps [Open JTalk](http://open-jtalk.sourceforge.net/) / HTS Engine /
+MeCab / the NAIST Japanese Dictionary (see its own `THIRD_PARTY_NOTICES.md` for those components'
+licenses); this package does not separately reproduce those, since it consumes openjtalkjs only
+as a prebuilt WASM binary, not as source.
 
 ---
 
@@ -241,4 +247,38 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+```
+
+## BSD-3-Clause (openjtalkjs)
+
+```
+BSD 3-Clause License
+
+Copyright (c) 2026, openjtalkjs contributors
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
