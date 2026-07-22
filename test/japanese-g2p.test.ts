@@ -24,7 +24,7 @@ function deferred<T>() {
 }
 
 function okResponse() {
-  return { ok: true, status: 200, arrayBuffer: async () => new ArrayBuffer(0) } as Response;
+  return { ok: true, status: 200, body: null, arrayBuffer: async () => new ArrayBuffer(0) } as unknown as Response;
 }
 
 describe("loadJapaneseG2P", () => {
@@ -71,14 +71,32 @@ describe("loadJapaneseG2P", () => {
     await expect(loadJapaneseG2P(CONFIG_B)).rejects.toThrow(/different dicUrl\/voiceUrl/);
   });
 
-  it("allows a retry with the same config after a failed configure", async () => {
-    configureMock.mockRejectedValueOnce(new Error("worker unavailable"));
-    configureMock.mockResolvedValueOnce(undefined);
+  it("allows a retry with the same config after a prefetch failure (before configure() was ever sent)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("network error"))
+      .mockImplementation(async () => okResponse());
+    vi.stubGlobal("fetch", fetchMock);
+    configureMock.mockResolvedValue(undefined);
     const { loadJapaneseG2P } = await import("../src/g2p/japanese.js");
 
-    await expect(loadJapaneseG2P(CONFIG_A)).rejects.toThrow("worker unavailable");
+    await expect(loadJapaneseG2P(CONFIG_A)).rejects.toThrow("network error");
     await expect(loadJapaneseG2P(CONFIG_A)).resolves.toBeUndefined();
-    expect(configureMock).toHaveBeenCalledTimes(2);
+    expect(configureMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not retry (and never sends a second configure()) once configure() itself has been dispatched and failed", async () => {
+    // openjtalkjs's worker-side timeout only rejects our pending promise —
+    // it can't cancel whatever the worker is still doing. A subsequent call
+    // must not risk sending a second, conflicting configure() while the
+    // first might still be running there, so the module stays permanently
+    // locked (and replays the same rejection) instead of retrying.
+    configureMock.mockRejectedValue(new Error("worker request timed out"));
+    const { loadJapaneseG2P } = await import("../src/g2p/japanese.js");
+
+    await expect(loadJapaneseG2P(CONFIG_A)).rejects.toThrow("worker request timed out");
+    await expect(loadJapaneseG2P(CONFIG_A)).rejects.toThrow("worker request timed out");
+    expect(configureMock).toHaveBeenCalledTimes(1);
   });
 
   it("throws from japaneseTextToPhonemes if loadJapaneseG2P was never called", async () => {

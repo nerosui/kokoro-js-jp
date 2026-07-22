@@ -62,14 +62,31 @@ const DIC_FILES = ["sys.dic", "matrix.bin", "char.bin", "unk.dic", "left-id.def"
 // each response body (not just await the fetch() promise, which resolves as
 // soon as headers arrive) so this function doesn't return — and let
 // configure() proceed — before the ~100MB download has actually finished
-// landing in the HTTP cache.
+// landing in the HTTP cache. We drain the body a chunk at a time via the
+// stream reader instead of `res.arrayBuffer()`, so we never hold the whole
+// ~100MB (x9 files in parallel) in JS heap at once — we only need the bytes
+// to reach the HTTP cache, not to look at them ourselves.
+async function drainResponseBody(res: Response): Promise<void> {
+  const reader = res.body?.getReader();
+  if (!reader) {
+    // Environments without a streamable Response.body (rare; some older
+    // runtimes) fall back to buffering the whole response.
+    await res.arrayBuffer();
+    return;
+  }
+  for (;;) {
+    const { done } = await reader.read();
+    if (done) break;
+  }
+}
+
 async function warmDictionaryCache(config: JapaneseG2PConfig): Promise<void> {
   const urls = [...DIC_FILES.map((f) => `${config.dicUrl}/${f}`), config.voiceUrl];
   await Promise.all(
     urls.map(async (url) => {
       const res = await fetch(url, { cache: "force-cache" });
       if (!res.ok) throw new Error(`failed to prefetch ${url}: HTTP ${res.status}`);
-      await res.arrayBuffer();
+      await drainResponseBody(res);
     }),
   );
 }
@@ -81,15 +98,32 @@ export async function loadJapaneseG2P(config: JapaneseG2PConfig): Promise<void> 
   if (configuredWith) return;
   if (!configuringPromise) {
     activeConfig = config;
+    // Once we've actually sent a configure() message to the vendored
+    // openjtalkjs worker (src/vendor/openjtalk/browser.js), we can't cancel
+    // it or know its true outcome if our client-side call times out (its
+    // hardcoded 20s REQUEST_TIMEOUT_MS only rejects *our* pending promise;
+    // the worker keeps running the request to completion in the
+    // background). So we only allow retrying loadJapaneseG2P() after a
+    // failure that happened *before* configure() was ever sent (e.g. our
+    // own prefetch failing on a 404/network error) — once configure() has
+    // been dispatched, this module stays permanently locked to `config`
+    // even on failure/timeout, so we can never send a conflicting second
+    // configure() while the first might still be running on the worker.
+    let configureSent = false;
     configuringPromise = warmDictionaryCache(config)
-      .then(() => configure(config))
+      .then(() => {
+        configureSent = true;
+        return configure(config);
+      })
       .then(
         () => {
           configuredWith = config;
         },
         (err) => {
-          configuringPromise = null;
-          activeConfig = null;
+          if (!configureSent) {
+            configuringPromise = null;
+            activeConfig = null;
+          }
           throw err;
         },
       );
