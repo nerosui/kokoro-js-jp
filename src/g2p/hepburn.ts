@@ -7,7 +7,7 @@
 // This module ports the HEPBURN kana->IPA table and the single-mora mapping
 // algorithm (_get_single_mapping in the original) from Python to TypeScript.
 // It operates on a HIRAGANA string (word segmentation and reading lookup are
-// delegated to openjtalkjs upstream, see g2p/index.ts).
+// delegated to openjtalkjs upstream, see g2p/japanese.ts).
 
 /** hiragana (single char) / digraph -> Kokoro-compatible IPA-ish phoneme */
 export const HEPBURN: Record<string, string> = {

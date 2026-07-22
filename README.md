@@ -17,6 +17,21 @@ Worker + WASMのgrapheme-to-phonemeに依存する都合上ブラウザ専用(ES
 
 ビルド/型チェック/単体テストに加え、実ブラウザ(Playwright)でのe2eテストも通っている
 (`test/e2e/`、英語・日本語の実合成 + 辞書/ボイス到達性の回帰テスト。詳細は「テスト」節参照)。
+CIでは型チェック・単体テスト・ビルドを実行している(`.github/workflows/ci.yml`)。ブラウザe2eは
+現時点ではローカル実行のみで、CIには組み込まれていない(既知の制約)。
+
+## インストール
+
+```bash
+npm install kokoro-js-jp
+```
+
+依存先の`@huggingface/transformers`(kokoro-js経由)は、このパッケージが実際には一切使わない
+Node向けネイティブ依存(`onnxruntime-node`、`sharp`)も通常の`dependencies`として持っているため、
+`npm install`時にこれらのビルド/ダウンロードが走る。ブラウザ専用パッケージとしては不要なコストだが、
+上流(`@huggingface/transformers`)側の依存構成であり、本パッケージ側では制御できない。
+
+対応Node.jsは20以上(ビルド・テスト実行用。ブラウザ本体での動作には無関係)。
 
 ## 使い方
 
@@ -92,8 +107,18 @@ npm run test:e2e
 初回実行はKokoro-82M ONNXモデル(`dtype: "q4"`、最小量子化)をHugging Face Hubからダウンロードする
 ため数分かかることがある。詳細な手順・デバッグ方法・既知の落とし穴(ビルド後の`dist/index.js`が
 `kokoro-js`をbare importする関係で、素のブラウザ実行にはimport mapが必要、等)は
-[`AGENTS.md`](AGENTS.md)を参照。Claude Codeでの実行には`.claude/agents/browser-e2e-tester.md`
-サブエージェントと`/browser-e2e-test`スキル(`.claude/skills/browser-e2e-test/`)を用意している。
+[`AGENTS.md`](AGENTS.md)を参照(AGENTS.mdはメンテナ・エージェント向けの開発者向けドキュメントで、
+Claude Code連携(`.claude/`配下のサブエージェント・スキル)もそちらに記載している)。
+
+## 既知の制限
+
+- Kokoro-82M ONNXモデル(`onnx-community/Kokoro-82M-v1.0-ONNX`)はrevisionを固定せずHugging Face
+  Hubから取得している。kokoro-js本体の`KokoroTTS.from_pretrained()`がrevision指定をサポートして
+  いないため、本パッケージ側で固定することもできない。上流でモデルの中身が更新された場合、
+  取得結果が変わりうる。モデル自体のライセンス・利用規約は
+  [huggingface.co/hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)を参照(本リポジトリ
+  には転載していない)。
+- 依存関係の脆弱性監査(`npm audit`等)は定期実行していない。
 
 ## ライセンス
 

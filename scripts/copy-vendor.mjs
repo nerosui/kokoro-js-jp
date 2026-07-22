@@ -1,4 +1,4 @@
-// tsup bundles src/vendor/openjtalk/browser.js directly (it's statically
+// rollup bundles src/vendor/openjtalk/browser.js directly (it's statically
 // imported by src/g2p/japanese.ts), which inlines its
 // `new URL("./browser/worker.js", import.meta.url)` into dist/index.js.
 // worker.js itself is loaded by the browser as a Worker script (referenced

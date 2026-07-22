@@ -10,6 +10,15 @@ export type Lang = "en" | "ja";
 const EN_PREFIXES = ["af_", "am_", "bf_", "bm_"];
 const JA_PREFIXES = ["jf_", "jm_"];
 
+// kokoro-js validates English voice ids itself (against its own `VOICES`
+// table) inside generate()/generate_from_ids(), but that table only lists
+// English voices — Japanese ids aren't in it, so an unknown jf_*/jm_* id
+// would otherwise pass resolveLang() unnoticed and fail late with an opaque
+// error deep inside kokoro-js's model loading. This list is the full set of
+// Japanese voice ids kokoro-js ships (`node_modules/kokoro-js/voices/jf_*`,
+// `jm_*`), kept in sync manually with the kokoro-js dependency version.
+export const JA_VOICE_IDS = ["jf_alpha", "jf_gongitsune", "jf_nezumi", "jf_tebukuro", "jm_kumo"] as const;
+
 /**
  * The Kokoro-82M model ships 54 voices across 9 languages (see kokoro-js's
  * `voices/` directory), but only two are wired up end-to-end here:

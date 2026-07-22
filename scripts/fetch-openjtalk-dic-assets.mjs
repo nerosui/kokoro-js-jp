@@ -24,6 +24,7 @@
 // Same URLs openjtalkjs's own scripts/fetch-assets.mjs uses for its Node
 // native-addon demos, adapted here for this package's browser g2p path.
 
+import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import fs from "node:fs/promises";
 import https from "node:https";
@@ -32,9 +33,26 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { pipeline } from "node:stream/promises";
 
-const DIC_VERSION = "v1.11.1";
+const DIC_VERSION = "v2"; // bump to invalidate .cache/ when URLs/hashes below change
 const DIC_URL = "https://github.com/r9y9/open_jtalk/releases/download/v1.11.1/open_jtalk_dic_utf_8-1.11.tar.gz";
-const VOICE_URL = "https://raw.githubusercontent.com/r9y9/pyopenjtalk/master/pyopenjtalk/htsvoice/mei_normal.htsvoice";
+// sha256 of the tarball itself, verified 2026-07-23.
+const DIC_SHA256 = "fe6ba0e43542cef98339abdffd903e062008ea170b04e7e2a35da805902f382a";
+// Pinned to a specific commit (not `master`, which is mutable) so this
+// download can't silently change contents underneath the sha256 pin below.
+const VOICE_URL = "https://raw.githubusercontent.com/r9y9/pyopenjtalk/9029fbc9c4ba323f113343d893d72ed76a67d77c/pyopenjtalk/htsvoice/mei_normal.htsvoice";
+const VOICE_SHA256 = "f3be49a6838904a6c218790b64e07c3e83c1886e995dca284b413caab19184de";
+
+async function sha256(file) {
+  const buf = await fs.readFile(file);
+  return createHash("sha256").update(buf).digest("hex");
+}
+
+async function verifyChecksum(file, expected, label) {
+  const actual = await sha256(file);
+  if (actual !== expected) {
+    throw new Error(`fetch-openjtalk-dic-assets: checksum mismatch for ${label}\n  expected: ${expected}\n  actual:   ${actual}\nRefusing to use this download. If upstream intentionally changed the file, update the pinned hash in scripts/fetch-openjtalk-dic-assets.mjs after manually verifying the new content.`);
+  }
+}
 
 const rootDir = path.resolve(fileURLToPath(import.meta.url), "../..");
 const cacheDir = path.join(rootDir, ".cache/openjtalk-assets");
@@ -74,14 +92,18 @@ async function isNonEmptyFile(file) {
     .catch(() => false);
 }
 
+// The 8 files openjtalkjs's browser runtime fetches individually from
+// `dicUrl` at load time (see src/index.ts) — a cache is only valid if all 8
+// are present, not just sys.dic.
+const DIC_FILES = ["sys.dic", "matrix.bin", "char.bin", "unk.dic", "left-id.def", "right-id.def", "pos-id.def", "rewrite.def"];
+
 async function ensureCache() {
-  const cached =
-    (await fs
-      .readFile(markerFile, "utf8")
-      .then((v) => v.trim() === DIC_VERSION)
-      .catch(() => false)) &&
-    (await isNonEmptyFile(path.join(cacheDicDir, "sys.dic"))) &&
-    (await isNonEmptyFile(cacheVoiceFile));
+  const versionOk = await fs
+    .readFile(markerFile, "utf8")
+    .then((v) => v.trim() === DIC_VERSION)
+    .catch(() => false);
+  const dicFilesOk = versionOk ? (await Promise.all(DIC_FILES.map((f) => isNonEmptyFile(path.join(cacheDicDir, f))))).every(Boolean) : false;
+  const cached = versionOk && dicFilesOk && (await isNonEmptyFile(cacheVoiceFile));
   if (cached) {
     console.log("fetch-openjtalk-dic-assets: cache already populated, skipping download");
     return;
@@ -91,6 +113,7 @@ async function ensureCache() {
   const tgz = path.join(cacheDir, "dic.tar.gz");
   await download(DIC_URL, tgz);
   if (!(await isNonEmptyFile(tgz))) throw new Error("Downloaded dictionary archive is empty");
+  await verifyChecksum(tgz, DIC_SHA256, "dictionary tarball");
 
   const untar = spawnSync("tar", ["-xzf", tgz, "-C", cacheDir], { stdio: "inherit" });
   if (untar.status !== 0) throw new Error("Failed to extract dictionary archive");
@@ -102,6 +125,8 @@ async function ensureCache() {
 
   console.log(`fetch-openjtalk-dic-assets: downloading voice (${VOICE_URL})`);
   await download(VOICE_URL, cacheVoiceFile);
+  if (!(await isNonEmptyFile(cacheVoiceFile))) throw new Error("Downloaded voice file is empty");
+  await verifyChecksum(cacheVoiceFile, VOICE_SHA256, "HTS voice file");
 
   await fs.writeFile(markerFile, `${DIC_VERSION}\n`, "utf8");
 }

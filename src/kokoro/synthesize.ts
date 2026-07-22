@@ -47,7 +47,7 @@ export async function speakEnglish(tts: KokoroTTS, text: string, voice: string, 
 export async function speakJapanese(tts: KokoroTTS, text: string, voice: string, speed = 1): Promise<RawAudio> {
   const phonemes = await japaneseTextToPhonemes(text);
   if (!phonemes) {
-    throw new Error(`japaneseTextToPhonemes produced no output for: ${text}`);
+    throw new Error(`japaneseTextToPhonemes produced no output for input text of length ${text.length}`);
   }
   const { input_ids } = tts.tokenizer(phonemes, { truncation: true });
   return tts.generate_from_ids(input_ids, { voice: voice as Parameters<KokoroTTS["generate_from_ids"]>[1] extends { voice?: infer V } ? V : never, speed });

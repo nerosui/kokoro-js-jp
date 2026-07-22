@@ -7,7 +7,9 @@
     "default": "./dist/index.js"
   },
   "scripts": {
-    "build": "rm -rf dist && rollup -c && node scripts/copy-vendor.mjs && node scripts/fetch-openjtalk-dic-assets.mjs",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npm run clean && rollup -c && node scripts/copy-vendor.mjs && node scripts/fetch-openjtalk-dic-assets.mjs",
+    "prepack": "npm run typecheck && npm run build",
     "format": "prettier --write . --print-width 1000",
     "test": "vitest run",
     "test:e2e": "playwright test",

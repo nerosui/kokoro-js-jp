@@ -29,12 +29,58 @@ export type JapaneseG2PConfig = {
   voiceUrl: string;
 };
 
-let configured = false;
+// The underlying openjtalkjs worker (src/vendor/openjtalk/browser.js) owns a
+// single Worker + single WASM instance for the whole page — `configure()` is
+// process-global, not per-caller, no matter how many KokoroJP instances call
+// loadJapaneseG2P(). We track the config it was configured with so a second
+// call with a *different* dicUrl/voiceUrl fails loudly instead of silently
+// keeping the first config, and we memoize the in-flight promise so
+// concurrent first calls share one configure() instead of racing two.
+let configuredWith: JapaneseG2PConfig | null = null;
+let configuringPromise: Promise<void> | null = null;
+
+// The 8 files openjtalkjs's worker-side configure() fetches from `dicUrl`
+// (see JapaneseG2PConfig doc above).
+const DIC_FILES = ["sys.dic", "matrix.bin", "char.bin", "unk.dic", "left-id.def", "right-id.def", "pos-id.def", "rewrite.def"];
+
+// src/vendor/openjtalk/browser.js (a byte-for-byte verified copy of
+// @keanu-thakalath/openjtalkjs, see THIRD_PARTY_NOTICES.md — deliberately
+// not patched) hardcodes a 20s timeout per worker request, including
+// configure(), which internally re-fetches all 8 dictionary files + the
+// voice file itself. On a slow connection, ~100MB of dictionary can easily
+// exceed 20s. A dedicated Worker shares the page's HTTP cache for
+// same-origin requests, so warming that cache here first (no timeout) means
+// the worker's own fetches resolve from cache almost instantly, keeping
+// configure() itself well inside the 20s budget.
+async function warmDictionaryCache(config: JapaneseG2PConfig): Promise<void> {
+  const urls = [...DIC_FILES.map((f) => `${config.dicUrl}/${f}`), config.voiceUrl];
+  const responses = await Promise.all(urls.map((url) => fetch(url, { cache: "force-cache" })));
+  for (const [i, res] of responses.entries()) {
+    if (!res.ok) throw new Error(`failed to prefetch ${urls[i]}: HTTP ${res.status}`);
+  }
+}
 
 export async function loadJapaneseG2P(config: JapaneseG2PConfig): Promise<void> {
-  if (configured) return;
-  await configure(config);
-  configured = true;
+  if (configuredWith) {
+    if (configuredWith.dicUrl !== config.dicUrl || configuredWith.voiceUrl !== config.voiceUrl) {
+      throw new Error(`Japanese g2p is already configured with a different dicUrl/voiceUrl (dicUrl=${configuredWith.dicUrl}, voiceUrl=${configuredWith.voiceUrl}). ` + `openjtalkjs's browser runtime is a single global engine per page, so all callers must use the same japanese config.`);
+    }
+    return;
+  }
+  if (!configuringPromise) {
+    configuringPromise = warmDictionaryCache(config)
+      .then(() => configure(config))
+      .then(
+        () => {
+          configuredWith = config;
+        },
+        (err) => {
+          configuringPromise = null;
+          throw err;
+        },
+      );
+  }
+  return configuringPromise;
 }
 
 function kataToHira(s: string): string {
@@ -60,7 +106,7 @@ function isKanaPron(pron: string): boolean {
  * Must call `loadJapaneseG2P` first.
  */
 export async function japaneseTextToPhonemes(text: string): Promise<string> {
-  if (!configured) {
+  if (!configuredWith) {
     throw new Error("loadJapaneseG2P() must be called before japaneseTextToPhonemes()");
   }
   const nodes: NJDNode[] = await runFrontendAsync(text);

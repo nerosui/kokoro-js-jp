@@ -26,8 +26,9 @@ Copyright (c) 2020 Paul O'Leary McCann. MIT License. See [MIT (cutlet)](#mit-lic
 ## openjtalkjs (vendored, browser/WASM build only, under src/vendor/openjtalk/)
 
 [keanu-thakalath/openjtalkjs](https://github.com/keanu-thakalath/openjtalkjs) — BSD 3-Clause
-License. The four files under `src/vendor/openjtalk/` (`browser.js`, `browser/worker.js`,
-`openjtalk-wasm-wrapper-D6E3BSJO.js`, `openjtalk-wasm.wasm`) are byte-for-byte copies of the
+License. The six files under `src/vendor/openjtalk/` (`browser.js`, `browser.d.ts`,
+`browser/worker.js`, `browser/worker.d.ts`, `openjtalk-wasm-wrapper-D6E3BSJO.js`,
+`openjtalk-wasm.wasm`) are byte-for-byte copies of the
 prebuilt browser/WASM assets published in
 [`@keanu-thakalath/openjtalkjs@0.1.0`](https://www.npmjs.com/package/@keanu-thakalath/openjtalkjs)
 (verified against the published npm tarball; sha512 `Mud5msXc83++jes/DDDz4huDuo/KH5TeTwy4LhLKdSahdAwwCZ9CVu8KL2Kp7MOJBNR755R4vW4mpFaFEfUgKg==`).

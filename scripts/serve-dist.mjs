@@ -69,6 +69,6 @@ const server = createServer(async (req, res) => {
 });
 
 const port = Number(process.env.PORT ?? 4173);
-server.listen(port, () => {
+server.listen(port, "127.0.0.1", () => {
   console.log(`serve-dist: http://localhost:${port} (dist/ + test/e2e/fixtures/)`);
 });
