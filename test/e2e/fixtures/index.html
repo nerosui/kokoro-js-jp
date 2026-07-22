@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>kokoro-js-jp e2e host page</title>
+    <!-- dist/index.js has a bare `import ... from "kokoro-js"` (left external on
+         purpose, see scripts/serve-dist.mjs) — a real consumer's bundler resolves
+         that from node_modules; a raw browser needs this import map instead. -->
+    <script type="importmap">
+      {
+        "imports": {
+          "kokoro-js": "/vendor/kokoro-js.web.js"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <!-- Intentionally empty: test/e2e/*.spec.ts drives everything via page.evaluate(),
+         dynamically importing /index.js (the built package, served from dist/). -->
+  </body>
+</html>
