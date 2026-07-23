@@ -1,13 +1,17 @@
 import type { RawAudio } from "@huggingface/transformers";
-import { loadJapaneseG2P, type JapaneseG2PConfig } from "./g2p/japanese.js";
+import { DEFAULT_JAPANESE_ASSETS_URL, loadJapaneseG2P, type JapaneseG2PConfig } from "./g2p/japanese.js";
 import { loadKokoro, speakEnglish, speakJapanese, type LoadOptions } from "./kokoro/synthesize.js";
 import { DEFAULT_VOICE_ID, JA_VOICE_IDS, resolveLang, type Lang } from "./voices.js";
 
-export { DEFAULT_VOICE_ID, resolveLang };
+export { DEFAULT_JAPANESE_ASSETS_URL, DEFAULT_VOICE_ID, resolveLang };
 export type { Lang, JapaneseG2PConfig, LoadOptions };
 
 export type KokoroJPOptions = LoadOptions & {
-  japanese?: JapaneseG2PConfig;
+  /**
+   * Japanese G2P assets. Omit to use this package version's jsDelivr assets,
+   * override URLs for self-hosting, or set false to disable Japanese.
+   */
+  japanese?: JapaneseG2PConfig | false;
 };
 
 /**
@@ -25,7 +29,7 @@ export class KokoroJP {
 
   static async load(options: KokoroJPOptions = {}): Promise<KokoroJP> {
     const tts = await loadKokoro(options);
-    return new KokoroJP(tts, options.japanese ?? null);
+    return new KokoroJP(tts, options.japanese === false ? null : (options.japanese ?? {}));
   }
 
   // Lazy: the Open JTalk dictionary is ~100MB, so English-only callers
@@ -38,7 +42,7 @@ export class KokoroJP {
   // configure() has actually been dispatched (see g2p/japanese.ts).
   private loadJapaneseG2POnce(): Promise<void> {
     if (!this.japaneseConfig) {
-      return Promise.reject(new Error("Japanese synthesis requires KokoroJP.load({ japanese: { assetsUrl } }). Use the versioned jsDelivr dist URL documented in README, or run kokoro-js-jp-copy-assets for self-hosting."));
+      return Promise.reject(new Error("Japanese synthesis is disabled because KokoroJP.load() was called with japanese: false."));
     }
     if (!this.japaneseG2PPromise) {
       this.japaneseG2PPromise = loadJapaneseG2P(this.japaneseConfig).catch((err) => {

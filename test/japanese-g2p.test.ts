@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import packageJson from "../package.json";
 
 // src/g2p/japanese.ts talks to the lazy worker client only through
 // `configureWorker()`/`runFrontendAsync()`. Mocking that module lets us
@@ -63,6 +64,20 @@ describe("loadJapaneseG2P", () => {
     await Promise.all([loadJapaneseG2P(CONFIG_A), loadJapaneseG2P(CONFIG_A)]);
 
     expect(configureMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("defaults to the version-matched jsDelivr assets directory", async () => {
+    configureMock.mockResolvedValue(undefined);
+    const { DEFAULT_JAPANESE_ASSETS_URL, loadJapaneseG2P } = await import("../src/g2p/japanese.js");
+
+    expect(DEFAULT_JAPANESE_ASSETS_URL).toBe(`https://cdn.jsdelivr.net/npm/kokoro-js-jp@${packageJson.version}/dist`);
+    await loadJapaneseG2P();
+
+    expect(configureMock).toHaveBeenCalledWith(`${DEFAULT_JAPANESE_ASSETS_URL}/browser/worker.js`, {
+      dicArchiveUrl: `${DEFAULT_JAPANESE_ASSETS_URL}/open_jtalk_dic_utf_8-1.11.tar.gz`,
+      dicUrl: undefined,
+      voiceUrl: `${DEFAULT_JAPANESE_ASSETS_URL}/openjtalk-voice.htsvoice`,
+    });
   });
 
   it("resolves an origin-root assetsUrl without producing double slashes", async () => {

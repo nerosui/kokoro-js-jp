@@ -11,13 +11,16 @@ import type { NJDNode } from "../vendor/openjtalk/browser.js";
 import { hiraganaWordToPhonemes, PUNCT } from "./hepburn.js";
 import { configureWorker, runFrontendAsync } from "./worker-client.js";
 
+export const DEFAULT_JAPANESE_ASSETS_URL = "https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.1/dist";
+
 export type JapaneseG2PConfig = {
   /**
    * Public URL containing the dictionary archive, HTS voice, Worker, and
    * WASM assets. This may be the versioned jsDelivr npm directory documented
-   * in README, or a directory created by `kokoro-js-jp-copy-assets`.
+   * in README, or a directory created by `kokoro-js-jp-copy-assets`. Defaults
+   * to the jsDelivr dist directory for this exact package version.
    */
-  assetsUrl: string;
+  assetsUrl?: string;
   /**
    * Optional overrides for advanced hosting layouts. The default archive
    * loader fetches and streams `dicArchiveUrl` into the WASM filesystem.
@@ -39,11 +42,12 @@ type ResolvedJapaneseG2PConfig = {
 };
 
 function resolveConfig(config: JapaneseG2PConfig): ResolvedJapaneseG2PConfig {
-  if (!config.assetsUrl.trim()) throw new Error("japanese.assetsUrl must be a non-empty public URL");
+  if (config.assetsUrl !== undefined && !config.assetsUrl.trim()) throw new Error("japanese.assetsUrl must be a non-empty public URL");
   if (config.dicArchiveUrl && config.dicUrl) throw new Error("japanese config must not specify both dicArchiveUrl and dicUrl");
+  const configuredAssetsUrl = config.assetsUrl ?? DEFAULT_JAPANESE_ASSETS_URL;
   // Keep the origin root usable: joining an empty normalized base with
   // `/open_jtalk...tar.gz` correctly produces an origin-relative URL.
-  const assetsUrl = config.assetsUrl === "/" ? "" : config.assetsUrl.replace(/\/+$/, "");
+  const assetsUrl = configuredAssetsUrl === "/" ? "" : configuredAssetsUrl.replace(/\/+$/, "");
   return {
     assetsUrl,
     dicArchiveUrl: config.dicUrl ? undefined : (config.dicArchiveUrl ?? `${assetsUrl}/open_jtalk_dic_utf_8-1.11.tar.gz`),
@@ -110,7 +114,7 @@ async function warmDictionaryCache(config: ResolvedJapaneseG2PConfig): Promise<v
   );
 }
 
-export async function loadJapaneseG2P(config: JapaneseG2PConfig): Promise<void> {
+export async function loadJapaneseG2P(config: JapaneseG2PConfig = {}): Promise<void> {
   const resolved = resolveConfig(config);
   if (activeConfig && !sameConfig(activeConfig, resolved)) {
     throw new Error(`Japanese g2p is already being configured or was already configured with different asset URLs (dicArchiveUrl=${activeConfig.dicArchiveUrl}, dicUrl=${activeConfig.dicUrl}, voiceUrl=${activeConfig.voiceUrl}, workerUrl=${activeConfig.workerUrl}). ` + `openjtalkjs's browser runtime is a single global engine per page, so all callers must use the same japanese config.`);
