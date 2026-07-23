@@ -1,8 +1,8 @@
 // Minimal static file server for the e2e suite (playwright.config.ts webServer).
 // Serves dist/ (the built package: index.js, the vendored openjtalkjs worker/WASM,
-// and the bundled Open JTalk dictionary/voice) at the root, falling back to
+// and the bundled Open JTalk dictionary archive/voice) at the root, falling back to
 // test/e2e/fixtures/ for the test host page. A real HTTP origin is required here —
-// ES module Workers and the dictionary directory fetches this package makes at
+// ES module Workers and the dictionary archive fetches this package makes at
 // runtime don't reliably work under file://.
 //
 // dist/index.js has a bare `import ... from "kokoro-js"` (left external by
@@ -49,6 +49,7 @@ const MIME_TYPES = {
   ".wasm": "application/wasm",
   ".html": "text/html; charset=utf-8",
   ".json": "application/json; charset=utf-8",
+  ".gz": "application/gzip",
 };
 
 async function readIfExists(dir, urlPath) {
@@ -72,19 +73,24 @@ async function readVendorFile(urlPath) {
   }
 }
 
-const server = createServer(async (req, res) => {
+async function handleRequest(req, res) {
   const urlPath = decodeURIComponent(new URL(req.url, "http://localhost").pathname);
   const data = (await readVendorFile(urlPath)) ?? (await readIfExists(distDir, urlPath)) ?? (await readIfExists(fixturesDir, urlPath));
   if (!data) {
-    res.writeHead(404, { "Content-Type": "text/plain" });
+    res.writeHead(404, { "Access-Control-Allow-Origin": "*", "Content-Type": "text/plain" });
     res.end(`not found: ${urlPath}`);
     return;
   }
-  res.writeHead(200, { "Content-Type": MIME_TYPES[path.extname(urlPath)] ?? "application/octet-stream" });
+  res.writeHead(200, { "Access-Control-Allow-Origin": "*", "Content-Type": MIME_TYPES[path.extname(urlPath)] ?? "application/octet-stream" });
   res.end(data);
-});
+}
 
 const port = Number(process.env.PORT ?? 4173);
+const server = createServer(handleRequest);
 server.listen(port, "127.0.0.1", () => {
   console.log(`serve-dist: http://localhost:${port} (dist/ + test/e2e/fixtures/)`);
+});
+const cdnServer = createServer(handleRequest);
+cdnServer.listen(port + 1, "127.0.0.1", () => {
+  console.log(`serve-dist: http://127.0.0.1:${port + 1} (cross-origin CDN fixture)`);
 });

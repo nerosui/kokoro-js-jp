@@ -1,6 +1,6 @@
 import type { NJDNode } from "../vendor/openjtalk/browser.js";
 
-const REQUEST_TIMEOUT_MS = 20_000;
+const REQUEST_TIMEOUT_MS = 60_000;
 
 type PendingRequest = {
   resolve: (value: unknown) => void;
@@ -13,6 +13,18 @@ let workerUrl: string | null = null;
 let workerFailure: Error | null = null;
 const pending = new Map<number, PendingRequest>();
 
+function constructWorker(url: string): Worker {
+  const resolved = new URL(url, globalThis.location.href);
+  if (resolved.origin === globalThis.location.origin) {
+    return new Worker(resolved.href, { type: "module" });
+  }
+  // Worker entrypoints must be same-origin even when the remote server sends
+  // CORS headers. A tiny same-origin blob worker can import the versioned
+  // jsDelivr module, whose own relative imports then stay on that CDN.
+  const bootstrap = URL.createObjectURL(new Blob([`import ${JSON.stringify(resolved.href)};`], { type: "text/javascript" }));
+  return new Worker(bootstrap, { type: "module" });
+}
+
 function ensureWorker(url: string): Worker {
   if (worker && workerUrl !== url) {
     throw new Error(`Open JTalk worker is already using ${workerUrl}; all callers must use the same workerUrl.`);
@@ -20,7 +32,7 @@ function ensureWorker(url: string): Worker {
   if (worker) return worker;
 
   workerUrl = url;
-  worker = new Worker(url, { type: "module" });
+  worker = constructWorker(url);
   worker.addEventListener("error", (event) => {
     workerFailure = new Error(`openjtalkjs browser worker failed to load: ${event.message || "unknown error"}`);
     for (const entry of pending.values()) entry.reject(workerFailure);
@@ -68,7 +80,7 @@ function callWorker<T>(url: string, method: string, args: unknown[]): Promise<T>
   });
 }
 
-export function configureWorker(workerUrl: string, config: { dicUrl: string; voiceUrl: string }): Promise<void> {
+export function configureWorker(workerUrl: string, config: { dicUrl?: string; dicArchiveUrl?: string; voiceUrl: string }): Promise<void> {
   return callWorker(workerUrl, "configure", [config]);
 }
 

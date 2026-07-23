@@ -13,31 +13,41 @@ import { configureWorker, runFrontendAsync } from "./worker-client.js";
 
 export type JapaneseG2PConfig = {
   /**
-   * Public URL of the directory created by `kokoro-js-jp-copy-assets`.
-   * The package deliberately requires this explicit URL because application
-   * bundlers do not copy npm package data files into their public output.
+   * Public URL containing the dictionary archive, HTS voice, Worker, and
+   * WASM assets. This may be the versioned jsDelivr npm directory documented
+   * in README, or a directory created by `kokoro-js-jp-copy-assets`.
    */
   assetsUrl: string;
   /**
-   * Optional overrides for advanced hosting layouts. `dicUrl` must serve the
-   * 8 loose dictionary files; `workerUrl` must point at browser/worker.js
-   * next to the copied WASM assets.
+   * Optional overrides for advanced hosting layouts. The default archive
+   * loader fetches and streams `dicArchiveUrl` into the WASM filesystem.
+   * `dicUrl` retains compatibility with hosts serving the 8 loose files;
+   * specify at most one of dicArchiveUrl and dicUrl.
    */
+  dicArchiveUrl?: string;
   dicUrl?: string;
   voiceUrl?: string;
   workerUrl?: string;
 };
 
-type ResolvedJapaneseG2PConfig = Required<JapaneseG2PConfig>;
+type ResolvedJapaneseG2PConfig = {
+  assetsUrl: string;
+  dicArchiveUrl?: string;
+  dicUrl?: string;
+  voiceUrl: string;
+  workerUrl: string;
+};
 
 function resolveConfig(config: JapaneseG2PConfig): ResolvedJapaneseG2PConfig {
   if (!config.assetsUrl.trim()) throw new Error("japanese.assetsUrl must be a non-empty public URL");
+  if (config.dicArchiveUrl && config.dicUrl) throw new Error("japanese config must not specify both dicArchiveUrl and dicUrl");
   // Keep the origin root usable: joining an empty normalized base with
-  // `/openjtalk-dic` correctly produces an origin-relative URL.
+  // `/open_jtalk...tar.gz` correctly produces an origin-relative URL.
   const assetsUrl = config.assetsUrl === "/" ? "" : config.assetsUrl.replace(/\/+$/, "");
   return {
     assetsUrl,
-    dicUrl: config.dicUrl ?? `${assetsUrl}/openjtalk-dic`,
+    dicArchiveUrl: config.dicUrl ? undefined : (config.dicArchiveUrl ?? `${assetsUrl}/open_jtalk_dic_utf_8-1.11.tar.gz`),
+    dicUrl: config.dicUrl,
     voiceUrl: config.voiceUrl ?? `${assetsUrl}/openjtalk-voice.htsvoice`,
     workerUrl: config.workerUrl ?? `${assetsUrl}/browser/worker.js`,
   };
@@ -48,7 +58,7 @@ function resolveConfig(config: JapaneseG2PConfig): ResolvedJapaneseG2PConfig {
 // process-global, not per-caller, no matter how many KokoroJP instances call
 // loadJapaneseG2P(). `activeConfig` holds whichever config is either
 // in-flight or already configured, so a second call with a *different*
-// dicUrl/voiceUrl fails loudly (whether it arrives before or after the first
+// dictionary/voice URLs fail loudly (whether it arrives before or after the first
 // call finishes) instead of silently joining/keeping the first config. We
 // memoize the in-flight promise so concurrent calls with the *same* config
 // share one configure() instead of racing two.
@@ -57,27 +67,23 @@ let configuredWith: ResolvedJapaneseG2PConfig | null = null;
 let configuringPromise: Promise<void> | null = null;
 
 function sameConfig(a: ResolvedJapaneseG2PConfig, b: ResolvedJapaneseG2PConfig): boolean {
-  return a.dicUrl === b.dicUrl && a.voiceUrl === b.voiceUrl && a.workerUrl === b.workerUrl;
+  return a.dicArchiveUrl === b.dicArchiveUrl && a.dicUrl === b.dicUrl && a.voiceUrl === b.voiceUrl && a.workerUrl === b.workerUrl;
 }
 
 // The 8 files openjtalkjs's worker-side configure() fetches from `dicUrl`
 // (see JapaneseG2PConfig doc above).
 const DIC_FILES = ["sys.dic", "matrix.bin", "char.bin", "unk.dic", "left-id.def", "right-id.def", "pos-id.def", "rewrite.def"];
 
-// Our worker client mirrors openjtalkjs's 20s timeout per request, including
-// configure(), which internally re-fetches all 8 dictionary files + the
-// voice file itself. On a slow connection, ~100MB of dictionary can easily
-// exceed 20s. A dedicated Worker shares the page's HTTP cache for
-// same-origin requests, so warming that cache here first (no timeout) means
-// the worker's own fetches resolve from cache almost instantly, keeping
-// configure() itself well inside the 20s budget. Crucially, we must consume
+// The worker downloads the archive/loose dictionary and voice itself. A
+// dedicated Worker shares the page's HTTP cache, so warming that cache here
+// first (without the worker request timeout) makes configure() reuse the
+// cached response. Crucially, we must consume
 // each response body (not just await the fetch() promise, which resolves as
 // soon as headers arrive) so this function doesn't return — and let
-// configure() proceed — before the ~100MB download has actually finished
-// landing in the HTTP cache. We drain the body a chunk at a time via the
-// stream reader instead of `res.arrayBuffer()`, so we never hold the whole
-// ~100MB (x9 files in parallel) in JS heap at once — we only need the bytes
-// to reach the HTTP cache, not to look at them ourselves.
+// configure() proceed — before the archive or loose files have actually
+// finished landing in the HTTP cache. We drain each body a chunk at a time
+// instead of calling `res.arrayBuffer()`, so the prefetch does not retain the
+// complete response in the JavaScript heap.
 async function drainResponseBody(res: Response): Promise<void> {
   const reader = res.body?.getReader();
   if (!reader) {
@@ -93,7 +99,8 @@ async function drainResponseBody(res: Response): Promise<void> {
 }
 
 async function warmDictionaryCache(config: ResolvedJapaneseG2PConfig): Promise<void> {
-  const urls = [...DIC_FILES.map((f) => `${config.dicUrl}/${f}`), config.voiceUrl];
+  const dictionaryUrls = config.dicArchiveUrl ? [config.dicArchiveUrl] : DIC_FILES.map((file) => `${config.dicUrl}/${file}`);
+  const urls = [...dictionaryUrls, config.voiceUrl];
   await Promise.all(
     urls.map(async (url) => {
       const res = await fetch(url, { cache: "force-cache" });
@@ -106,7 +113,7 @@ async function warmDictionaryCache(config: ResolvedJapaneseG2PConfig): Promise<v
 export async function loadJapaneseG2P(config: JapaneseG2PConfig): Promise<void> {
   const resolved = resolveConfig(config);
   if (activeConfig && !sameConfig(activeConfig, resolved)) {
-    throw new Error(`Japanese g2p is already being configured or was already configured with different asset URLs (dicUrl=${activeConfig.dicUrl}, voiceUrl=${activeConfig.voiceUrl}, workerUrl=${activeConfig.workerUrl}). ` + `openjtalkjs's browser runtime is a single global engine per page, so all callers must use the same japanese config.`);
+    throw new Error(`Japanese g2p is already being configured or was already configured with different asset URLs (dicArchiveUrl=${activeConfig.dicArchiveUrl}, dicUrl=${activeConfig.dicUrl}, voiceUrl=${activeConfig.voiceUrl}, workerUrl=${activeConfig.workerUrl}). ` + `openjtalkjs's browser runtime is a single global engine per page, so all callers must use the same japanese config.`);
   }
   if (configuredWith) return;
   if (!configuringPromise) {
@@ -126,7 +133,7 @@ export async function loadJapaneseG2P(config: JapaneseG2PConfig): Promise<void> 
     configuringPromise = warmDictionaryCache(resolved)
       .then(() => {
         configureSent = true;
-        return configureWorker(resolved.workerUrl, { dicUrl: resolved.dicUrl, voiceUrl: resolved.voiceUrl });
+        return configureWorker(resolved.workerUrl, { dicArchiveUrl: resolved.dicArchiveUrl, dicUrl: resolved.dicUrl, voiceUrl: resolved.voiceUrl });
       })
       .then(
         () => {

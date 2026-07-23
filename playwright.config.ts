@@ -7,8 +7,8 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./test/e2e",
   // Generous: first run downloads the Kokoro ONNX model (dtype: "q4" in the spec
-  // to keep this as small as practical) plus this package's bundled ~100MB Open
-  // JTalk dictionary, both over the network, with no cross-run cache (see
+  // to keep this as small as practical) plus this package's ~24MB Open JTalk
+  // dictionary archive, both over the network, with no cross-run cache (see
   // AGENTS.md for why).
   timeout: 5 * 60 * 1000,
   fullyParallel: false,
