@@ -1,16 +1,16 @@
 import { expect, test } from "@playwright/test";
+import { createHash } from "node:crypto";
 
-// Fast, no-page check: this alone would have caught the dicUrl bug this suite
-// was written for — openjtalkjs's browser runtime fetches these 8 files
-// individually as `${dicUrl}/<file>` (see src/g2p/japanese.ts), so a URL
-// shaped like an archive (the original, broken default) 404s here immediately
-// instead of only surfacing later as an opaque WASM configure() failure.
-test("bundled dictionary + voice assets are reachable", async ({ request }) => {
-  const dicFiles = ["sys.dic", "matrix.bin", "char.bin", "unk.dic", "left-id.def", "right-id.def", "pos-id.def", "rewrite.def"];
-  for (const file of dicFiles) {
-    const res = await request.get(`/openjtalk-dic/${file}`);
-    expect(res.ok(), `GET /openjtalk-dic/${file}`).toBeTruthy();
-  }
+const DIC_ARCHIVE_PATH = "/open_jtalk_dic_utf_8-1.11.tar.gz";
+const DIC_ARCHIVE_SHA256 = "33e9cd251bc41aa2bd7ca36f57abbf61eae3543ca25ca892ae345e394cb10549";
+
+// Fast, no-page check: verify the two large runtime assets before involving
+// the Worker/WASM pipeline. The full-pipeline test below proves the archive
+// can also be decompressed and installed into the WASM filesystem.
+test("bundled dictionary archive + voice are reachable", async ({ request }) => {
+  const archiveRes = await request.get(DIC_ARCHIVE_PATH);
+  expect(archiveRes.ok(), `GET ${DIC_ARCHIVE_PATH}`).toBeTruthy();
+  expect(createHash("sha256").update(await archiveRes.body()).digest("hex"), `${DIC_ARCHIVE_PATH} SHA-256`).toBe(DIC_ARCHIVE_SHA256);
   const voiceRes = await request.get("/openjtalk-voice.htsvoice");
   expect(voiceRes.ok(), "GET /openjtalk-voice.htsvoice").toBeTruthy();
 });
@@ -29,7 +29,9 @@ test("full pipeline: English + Japanese synthesis, unsupported voiceId", async (
     const { KokoroJP } = await import("/consumer.js");
     const tts = await KokoroJP.load({
       dtype: "q4", // smallest quantization: this only needs to prove the pipeline runs, not audio quality
-      japanese: { assetsUrl: "/" },
+      // A separate origin exercises the same blob-bootstrap Worker path used
+      // by the documented jsDelivr configuration.
+      japanese: { assetsUrl: "http://127.0.0.1:4174" },
     });
 
     const summarize = (audio: { audio: Float32Array; sampling_rate: number }) => ({

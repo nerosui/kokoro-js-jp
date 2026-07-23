@@ -38,7 +38,7 @@ export class KokoroJP {
   // configure() has actually been dispatched (see g2p/japanese.ts).
   private loadJapaneseG2POnce(): Promise<void> {
     if (!this.japaneseConfig) {
-      return Promise.reject(new Error("Japanese synthesis requires KokoroJP.load({ japanese: { assetsUrl } }). Run kokoro-js-jp-copy-assets for the public asset directory first."));
+      return Promise.reject(new Error("Japanese synthesis requires KokoroJP.load({ japanese: { assetsUrl } }). Use the versioned jsDelivr dist URL documented in README, or run kokoro-js-jp-copy-assets for self-hosting."));
     }
     if (!this.japaneseG2PPromise) {
       this.japaneseG2PPromise = loadJapaneseG2P(this.japaneseConfig).catch((err) => {

@@ -36,7 +36,7 @@ jobs:
           key: openjtalk-assets-${{ hashFiles('scripts/fetch-openjtalk-dic-assets.mjs') }}
       - run: npm ci
       # Builds dist/ (bundle + vendored openjtalkjs worker/WASM + the Open
-      # JTalk dictionary/voice, ~100MB) — same build the npm package ships,
+      # JTalk dictionary archive/voice, ~25MB) — same build the npm package ships,
       # reused here so the demo runs the real thing, not a mock.
       - run: npm run build
       - name: Assemble site

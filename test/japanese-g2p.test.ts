@@ -72,9 +72,29 @@ describe("loadJapaneseG2P", () => {
     await loadJapaneseG2P({ assetsUrl: "/" });
 
     expect(configureMock).toHaveBeenCalledWith("/browser/worker.js", {
-      dicUrl: "/openjtalk-dic",
+      dicArchiveUrl: "/open_jtalk_dic_utf_8-1.11.tar.gz",
+      dicUrl: undefined,
       voiceUrl: "/openjtalk-voice.htsvoice",
     });
+  });
+
+  it("retains the loose dictionary override for advanced self-hosting", async () => {
+    configureMock.mockResolvedValue(undefined);
+    const { loadJapaneseG2P } = await import("../src/g2p/japanese.js");
+
+    await loadJapaneseG2P({ assetsUrl: "https://cdn.example/assets", dicUrl: "https://files.example/dic" });
+
+    expect(configureMock).toHaveBeenCalledWith("https://cdn.example/assets/browser/worker.js", {
+      dicArchiveUrl: undefined,
+      dicUrl: "https://files.example/dic",
+      voiceUrl: "https://cdn.example/assets/openjtalk-voice.htsvoice",
+    });
+  });
+
+  it("rejects ambiguous archive and loose dictionary overrides", async () => {
+    const { loadJapaneseG2P } = await import("../src/g2p/japanese.js");
+
+    await expect(loadJapaneseG2P({ assetsUrl: "/assets", dicArchiveUrl: "/dic.tar.gz", dicUrl: "/dic" })).rejects.toThrow(/must not specify both/);
   });
 
   it("rejects a call with a different config while the first is still in flight", async () => {
@@ -111,7 +131,8 @@ describe("loadJapaneseG2P", () => {
     await expect(loadJapaneseG2P(CONFIG_A)).resolves.toBeUndefined();
     expect(configureMock).toHaveBeenCalledTimes(1);
     expect(configureMock).toHaveBeenCalledWith("https://a.example/assets/browser/worker.js", {
-      dicUrl: "https://a.example/assets/openjtalk-dic",
+      dicArchiveUrl: "https://a.example/assets/open_jtalk_dic_utf_8-1.11.tar.gz",
+      dicUrl: undefined,
       voiceUrl: "https://a.example/assets/openjtalk-voice.htsvoice",
     });
   });
@@ -143,7 +164,7 @@ describe("loadJapaneseG2P", () => {
 
     await loadJapaneseG2P(CONFIG_A);
 
-    expect(responses.size).toBe(9); // 8 dic files + voice file
+    expect(responses.size).toBe(2); // dictionary archive + voice file
     for (const res of responses.values()) {
       const reader = res.body?.getReader() as unknown as { read: ReturnType<typeof vi.fn> };
       expect(reader.read).toHaveBeenCalled();

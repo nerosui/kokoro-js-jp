@@ -15,7 +15,7 @@ const packageRoot = path.resolve(fileURLToPath(import.meta.url), "../..");
 const distDir = path.join(packageRoot, "dist");
 const destination = path.resolve(process.cwd(), destinationArg);
 const wasmAssets = (await readdir(distDir)).filter((name) => name.startsWith("openjtalk-wasm"));
-const assets = ["browser", "openjtalk-dic", "openjtalk-voice.htsvoice", ...wasmAssets];
+const assets = ["browser", "open_jtalk_dic_utf_8-1.11.tar.gz", "openjtalk-voice.htsvoice", ...wasmAssets];
 
 await mkdir(destination, { recursive: true });
 for (const asset of assets) {

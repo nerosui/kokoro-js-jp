@@ -22,10 +22,9 @@ file only adds agent-specific judgment calls.
 
 - **Dictionary/voice reachability test fails**: don't touch the e2e test. Check
   the `assetsUrl` mapping in `src/g2p/japanese.ts`, `scripts/copy-assets.mjs`, and whether
-  `scripts/fetch-openjtalk-dic-assets.mjs` actually populated `dist/openjtalk-dic/` with
-  all 8 files (`sys.dic`, `matrix.bin`, `char.bin`, `unk.dic`, `left-id.def`,
-  `right-id.def`, `pos-id.def`, `rewrite.def`) — a partial/failed fetch is the most likely
-  cause, not a test bug.
+  `scripts/fetch-openjtalk-dic-assets.mjs` actually populated
+  `dist/open_jtalk_dic_utf_8-1.11.tar.gz` and `dist/openjtalk-voice.htsvoice` with their
+  pinned SHA-256 values — a partial/failed fetch is the most likely cause, not a test bug.
 - **Full pipeline test fails with a module-resolution error** (`Failed to resolve module
 specifier`): a new bare import was added to `src/` that isn't in
   `rollup.config.js`'s `external` list version, or is external but missing from the import
@@ -55,8 +54,8 @@ re-running the full suite each time:
    const audio = await tts.speak("こんにちは", "jf_alpha");
    [audio.audio.length, audio.sampling_rate];
    ```
-4. `browser_console` / `browser_network` to see what actually failed (a 404 on a dic file,
-   a WASM instantiation error, a Worker that never posts back, etc.) — much more direct
+4. `browser_console` / `browser_network` to see what actually failed (a 404 on the archive,
+   a tar checksum error, a WASM instantiation error, a Worker that never posts back, etc.) — much more direct
    than inferring it from a thrown Error's message alone.
 
 This is for interactive investigation only — the actual regression test that must pass is
