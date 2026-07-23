@@ -6,8 +6,8 @@ Instructions for AI coding agents (Codex, Claude Code, or others) working in thi
 
 This package (Worker + WASM g2p + ONNX synthesis) cannot be meaningfully verified by
 `npm test` (vitest) alone — that suite only covers pure functions (`test/*.test.ts`), not
-whether the actual pipeline works in a browser. For a long time it didn't: the default
-`dicUrl` pointed at the wrong kind of URL and every `KokoroJP.load()` call failed silently
+whether the actual pipeline works in a browser. For a long time it didn't: the dictionary
+asset layout was incompatible with the Worker and every `KokoroJP.load()` call failed silently
 in the one way that never got caught until someone actually ran it in a browser. Don't
 repeat that mistake — after touching anything under `src/`, `scripts/copy-vendor.mjs`,
 `scripts/fetch-openjtalk-dic-assets.mjs`, or `rollup.config.js`, rebuild and re-run this
@@ -36,16 +36,15 @@ current setup, not a bug to "fix" by adding retries or shortening timeouts.
 
 `test/e2e/tts.spec.ts`:
 
-1. **Dictionary/voice reachability** (fast, no browser page needed) — a direct regression
-   test for the asset-layout bug: `dist/openjtalk-dic/` must serve 8 individual files
-   (`${dicUrl}/sys.dic`, `${dicUrl}/matrix.bin`, ...), not an archive. If this fails, don't
-   look further — check the `assetsUrl` mapping in `src/g2p/japanese.ts`,
-   `scripts/copy-assets.mjs`, and `scripts/fetch-openjtalk-dic-assets.mjs` first.
+1. **Dictionary archive/voice reachability** (fast, no browser page needed) — verifies the
+   official archive's pinned SHA-256 and the voice response before involving WASM. If this
+   fails, check the `assetsUrl` mapping in `src/g2p/japanese.ts`, `scripts/copy-assets.mjs`,
+   and `scripts/fetch-openjtalk-dic-assets.mjs` first.
 2. **Full pipeline** — one `page.evaluate()`, one `KokoroJP.load()` (kept to one to avoid
-   re-downloading the model 3x in one run): English synthesis via kokoro-js's own
-   phonemizer, Japanese synthesis via this package's Open JTalk g2p (Worker + WASM), and an
-   unsupported-voiceId error case. Asserts real non-silent audio came back (sample count,
-   24kHz sample rate, non-zero signal), not just "didn't throw."
+   re-downloading the model 3x in one run): a second local origin exercises the jsDelivr-like
+   cross-origin Worker bootstrap, streams the tar.gz into the WASM filesystem, synthesizes
+   English and Japanese, and checks an unsupported-voiceId error. Asserts real non-silent
+   audio came back (sample count, 24kHz sample rate, non-zero signal), not just "didn't throw."
 
 ## Debugging a failure
 

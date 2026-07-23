@@ -23,13 +23,13 @@ async function getModule() {
 }
 async function configureBrowser(config) {
   const mod = await getModule();
-  await mod.configure(config.dicUrl, config.voiceUrl);
+  await mod.configure(config.dicUrl, config.voiceUrl, config.dicArchiveUrl);
   configured = true;
 }
 async function ensureConfigured() {
   const mod = await getModule();
   if (!configured) {
-    throw new Error("openjtalkjs browser runtime not configured. Call configure({ dicUrl, voiceUrl }) first.");
+    throw new Error("openjtalkjs browser runtime not configured. Call configure({ dicArchiveUrl, voiceUrl }) first.");
   }
   return mod;
 }
