@@ -80,11 +80,10 @@ let japaneseWarmedUp = false;
 
 async function init() {
   try {
-    // GitHub Pages serves this demo below /kokoro-js-jp/, not at the origin
-    // root. Resolve the copied dist/ directory relative to this module so the
-    // same code also works for forks and local/static hosting.
-    const assetsUrl = new URL("./dist", import.meta.url).href;
-    tts = await KokoroJP.load({ dtype: "q8", japanese: { assetsUrl } });
+    // No japanese.assetsUrl override: this defaults to the jsDelivr dist/
+    // for this exact published package version (see DEFAULT_JAPANESE_ASSETS_URL
+    // in src/g2p/japanese.ts), same as any other consumer of the npm package.
+    tts = await KokoroJP.load({ dtype: "q8" });
     statusEl.textContent = "準備ができました。";
     speakEl.disabled = false;
   } catch (err) {
