@@ -37,6 +37,9 @@
     "@huggingface/transformers": "^3.5.1",
     "kokoro-js": "^1.2.1"
   },
+  "overrides": {
+    "sharp": "^0.35.3"
+  },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@rollup/plugin-node-resolve": "^16.0.3",
