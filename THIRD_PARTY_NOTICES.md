@@ -34,8 +34,9 @@ prebuilt browser/WASM assets published in
 (verified against the published npm tarball; sha512 `Mud5msXc83++jes/DDDz4huDuo/KH5TeTwy4LhLKdSahdAwwCZ9CVu8KL2Kp7MOJBNR755R4vW4mpFaFEfUgKg==`).
 That package's `install` script builds a native Node addon via `node-gyp`, which is not needed
 for (and would otherwise be a broken/unnecessary native-toolchain requirement imposed on) this
-browser-only library — so only the four static, browser-safe output files are vendored here
-rather than depending on the npm package directly. See [BSD-3-Clause (openjtalkjs)](#bsd-3-clause-openjtalkjs)
+browser-only library — so only its six browser-safe source/type assets are vendored here
+rather than depending on the npm package directly. Four runtime assets are copied into the
+published `dist/`. See [BSD-3-Clause (openjtalkjs)](#bsd-3-clause-openjtalkjs)
 below.
 
 ## Open JTalk dictionary (fetched at build time into dist/openjtalk-dic/, see scripts/fetch-openjtalk-dic-assets.mjs)

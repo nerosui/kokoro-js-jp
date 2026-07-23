@@ -26,8 +26,11 @@ test("full pipeline: English + Japanese synthesis, unsupported voiceId", async (
   // splitting this into multiple tests would multiply the model download.
   const result = await page.evaluate(async () => {
     // @ts-expect-error -- served build output, not resolvable at typecheck time
-    const { KokoroJP } = await import("/index.js");
-    const tts = await KokoroJP.load({ dtype: "q4" }); // smallest quantization: this only needs to prove the pipeline runs, not audio quality
+    const { KokoroJP } = await import("/consumer.js");
+    const tts = await KokoroJP.load({
+      dtype: "q4", // smallest quantization: this only needs to prove the pipeline runs, not audio quality
+      japanese: { assetsUrl: "/" },
+    });
 
     const summarize = (audio: { audio: Float32Array; sampling_rate: number }) => ({
       length: audio.audio.length,

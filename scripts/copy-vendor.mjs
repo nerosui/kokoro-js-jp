@@ -1,11 +1,9 @@
-// rollup bundles src/vendor/openjtalk/browser.js directly (it's statically
-// imported by src/g2p/japanese.ts), which inlines its
-// `new URL("./browser/worker.js", import.meta.url)` into dist/index.js.
-// worker.js itself is loaded by the browser as a Worker script (referenced
-// only as a URL string, invisible to the bundler's import graph) and in turn
+// The lazy worker client loads browser/worker.js from the explicit public URL
+// configured by the consumer. worker.js itself is referenced only as a URL
+// string (invisible to Rollup's import graph) and in turn
 // resolves "../openjtalk-wasm-wrapper-*.js" and "../openjtalk-wasm.wasm"
 // relative to itself. So these three assets must be copied to dist/ at the
-// same relative paths they'd have next to a bundled dist/index.js:
+// the same relative paths expected by `kokoro-js-jp-copy-assets`:
 //   dist/browser/worker.js            (was src/vendor/openjtalk/browser/worker.js)
 //   dist/openjtalk-wasm-wrapper-*.js  (was src/vendor/openjtalk/openjtalk-wasm-wrapper-*.js)
 //   dist/openjtalk-wasm.wasm          (was src/vendor/openjtalk/openjtalk-wasm.wasm)

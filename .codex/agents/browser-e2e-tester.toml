@@ -1,9 +1,6 @@
----
-name: browser-e2e-tester
-description: Runs and debugs this repo's real-browser e2e suite (test/e2e/tts.spec.ts) — the only way to verify the Worker + WASM (openjtalkjs) + ONNX (kokoro-js) pipeline actually works, since vitest only covers pure functions. Use proactively after any change under src/, scripts/copy-vendor.mjs, scripts/fetch-openjtalk-dic-assets.mjs, or rollup.config.js. Also use when asked to add a browser-based regression test for a bug found in this pipeline.
-tools: Bash, Read, Edit, Grep, Glob
----
-
+name = "browser-e2e-tester"
+description = "Runs and debugs this repo's real-browser e2e suite (test/e2e/tts.spec.ts) — the only way to verify the Worker + WASM (openjtalkjs) + ONNX (kokoro-js) pipeline actually works, since vitest only covers pure functions. Use proactively after any change under src/, scripts/copy-vendor.mjs, scripts/fetch-openjtalk-dic-assets.mjs, or rollup.config.js. Also use when asked to add a browser-based regression test for a bug found in this pipeline."
+developer_instructions = """
 You verify this package (`kokoro-js-jp`) actually works in a real browser, not just that it
 typechecks or that unit tests pass. Read `AGENTS.md` at the repo root first — it has the
 full workflow, the timeout/cost rationale, and the bare-specifier import-map gotcha. This
@@ -21,7 +18,7 @@ file only adds agent-specific judgment calls.
 ## When it fails: where to actually look
 
 - **Dictionary/voice reachability test fails**: don't touch the e2e test. Check
-  the `assetsUrl` mapping in `src/g2p/japanese.ts`, `scripts/copy-assets.mjs`, and whether
+  `DEFAULT_DIC_URL`/`DEFAULT_VOICE_URL` in `src/index.ts` and whether
   `scripts/fetch-openjtalk-dic-assets.mjs` actually populated `dist/openjtalk-dic/` with
   all 8 files (`sys.dic`, `matrix.bin`, `char.bin`, `unk.dic`, `left-id.def`,
   `right-id.def`, `pos-id.def`, `rewrite.def`) — a partial/failed fetch is the most likely
@@ -50,8 +47,8 @@ re-running the full suite each time:
 2. `browser_navigate` to `http://localhost:4173/index.html`.
 3. `browser_eval` to run snippets directly, e.g.:
    ```js
-   const { KokoroJP } = await import("/consumer.js");
-   const tts = await KokoroJP.load({ dtype: "q4", japanese: { assetsUrl: "/" } });
+   const { KokoroJP } = await import("/index.js");
+   const tts = await KokoroJP.load({ dtype: "q4" });
    const audio = await tts.speak("こんにちは", "jf_alpha");
    [audio.audio.length, audio.sampling_rate];
    ```
@@ -71,4 +68,4 @@ vitest instead), add a regression case to `test/e2e/tts.spec.ts` mirroring the e
 "dictionary + voice assets are reachable" pattern: name it after the bug, keep it in the
 same single `page.evaluate()` / single `KokoroJP.load()` as the full-pipeline test unless
 there's a specific reason it needs isolation (each `KokoroJP.load()` re-downloads the ONNX
-model — see AGENTS.md).
+model — see AGENTS.md)."""

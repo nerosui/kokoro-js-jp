@@ -15,7 +15,7 @@
     </script>
   </head>
   <body>
-    <!-- Intentionally empty: test/e2e/*.spec.ts drives everything via page.evaluate(),
-         dynamically importing /index.js (the built package, served from dist/). -->
+    <!-- Intentionally empty: the test imports /consumer.js, a real Rollup consumer
+         bundle generated in memory by scripts/serve-dist.mjs. -->
   </body>
 </html>
