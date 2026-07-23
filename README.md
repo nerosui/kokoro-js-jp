@@ -114,7 +114,7 @@ const tts = await KokoroJP.load({
 
 | コマンド | 説明 |
 | --- | --- |
-| `npm run build` | `rollup -c`(TypeScript直接バンドル、ESM単一出力+d.ts、kokoro-jsと同じnodeResolve+terser構成)でビルドした後、`scripts/copy-vendor.mjs`がvendorしているopenjtalkjsのworker/WASMアセットを、`scripts/fetch-openjtalk-dic-assets.mjs`がOpen JTalk辞書(約100MB)+デフォルトHTSボイスを、それぞれバンドル後のコードが期待する相対パスで`dist/`にコピーする(辞書はローカルの`.cache/`に取得キャッシュを持つため、2回目以降のビルドでは再ダウンロードしない) |
+| `npm run build` | `rollup -c`(TypeScript直接バンドル、ESM単一出力+d.ts、kokoro-jsと同じnodeResolve+terser構成)でビルドした後、`scripts/copy-vendor.mjs`がvendorしているopenjtalkjsのworker/WASMアセットを、`scripts/fetch-openjtalk-dic-assets.mjs`がOpen JTalk辞書(約100MB)+公式辞書tar.gz+デフォルトHTSボイスを、それぞれバンドル後のコードが期待する相対パスで`dist/`にコピーする(辞書はローカルの`.cache/`に取得キャッシュを持つため、2回目以降のビルドでは再ダウンロードしない) |
 | `npx kokoro-js-jp-copy-assets <public-directory>` | 公開済みnpmパッケージから、辞書・HTS voice・Worker・WASMをconsumerアプリのpublicディレクトリへコピーする |
 | `npm run format` | `prettier --write .`(kokoro-jsと同じ`--print-width 1000`) |
 | `npm test` | `vitest run`(g2p・ボイステーブルの純粋関数テストのみ。ブラウザ/WASMは絡まない) |
@@ -146,6 +146,14 @@ Apache-2.0(kokoro-js本体、および本パッケージがportしている misa
 
 ## パッケージサイズについて
 
-Open JTalk辞書(主に`sys.dic`が約100MB)を`dist/`に同梱しているため、npmパッケージ自体が約100MBになる。kokoro-js本体(ONNXモデルは同梱せず実行時にHugging Face Hubから取得)とは対照的だが、本パッケージのdicUrlは*ディレクトリ*(個別ファイルを`${dicUrl}/sys.dic`のように1本ずつfetchする形)を要求するため、この用途にHugging Face Hubのようなキャッシュ付き実行時取得はそのまま使えない。
+Open JTalk辞書(主に`sys.dic`が約100MB)を`dist/`に同梱しているため、npmパッケージ自体が約130MBになる。展開済み辞書に加え、ブラウザ/CDN向けの公式辞書アーカイブ`dist/open_jtalk_dic_utf_8-1.11.tar.gz`(約24MB)も収録する。公開後はバージョンを固定した次のjsDelivr URLからCORS付きで取得できる:
+
+```text
+https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.0/dist/open_jtalk_dic_utf_8-1.11.tar.gz
+```
+
+現行の`KokoroJP.load()`は引き続き展開済み辞書ディレクトリを使用し、このtar.gzを直接は読まない。アーカイブはCDN配信およびブラウザ向けストリーミング展開ローダーで利用できる配布物として収録している。
+
+kokoro-js本体(ONNXモデルは同梱せず実行時にHugging Face Hubから取得)とは対照的だが、本パッケージのdicUrlは*ディレクトリ*(個別ファイルを`${dicUrl}/sys.dic`のように1本ずつfetchする形)を要求するため、この用途にHugging Face Hubのようなキャッシュ付き実行時取得はそのまま使えない。
 
 付属の`kokoro-js-jp-copy-assets`でアプリの公開ディレクトリへ配置する。日本語辞書のロード自体は`speak()`で日本語voiceIdを初めて使った時点まで遅延するため、英語のみの利用ではダウンロードもメモリ確保も発生しない。

@@ -39,12 +39,14 @@ rather than depending on the npm package directly. Four runtime assets are copie
 published `dist/`. See [BSD-3-Clause (openjtalkjs)](#bsd-3-clause-openjtalkjs)
 below.
 
-## Open JTalk dictionary (fetched at build time into dist/openjtalk-dic/, see scripts/fetch-openjtalk-dic-assets.mjs)
+## Open JTalk dictionary (fetched at build time into dist/, see scripts/fetch-openjtalk-dic-assets.mjs)
 
 The 8 dictionary files openjtalkjs's g2p runtime reads at startup (`sys.dic`, `matrix.bin`,
 `char.bin`, `unk.dic`, `left-id.def`, `right-id.def`, `pos-id.def`, `rewrite.def`), from
-[`open_jtalk_dic_utf_8-1.11.tar.gz`](https://github.com/r9y9/open_jtalk/releases/tag/v1.11.1)
-(also the exact tarball `openjtalkjs` itself downloads for its own demos/tests). Three
+the Open JTalk project's official SourceForge release
+[`open_jtalk_dic_utf_8-1.11.tar.gz`](https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download).
+The verified archive is published at `dist/open_jtalk_dic_utf_8-1.11.tar.gz`, and its 8
+runtime files are also extracted into `dist/openjtalk-dic/`. Three
 Modified-BSD copyright notices apply, all bundled in the tarball's own `COPYING` file (also
 copied to `dist/openjtalk-dic/COPYING`): NAIST Japanese Dictionary (Copyright (c) 2009, Nara
 Institute of Science and Technology), UniDic (Copyright (c) 2011-2017, The UniDic Consortium),
