@@ -7,7 +7,7 @@
     "default": "./dist/index.js"
   },
   "bin": {
-    "kokoro-js-jp-copy-assets": "./scripts/copy-assets.mjs"
+    "kokoro-js-jp-copy-assets": "scripts/copy-assets.mjs"
   },
   "scripts": {
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
