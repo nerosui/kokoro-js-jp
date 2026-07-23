@@ -4,7 +4,7 @@
 
 - **音声合成**: [kokoro-js](https://github.com/hexgrad/kokoro)(npm: `kokoro-js`)/ transformers.js(ONNX)経由の[Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)
 - **日本語G2P**(読み仮名→音素変換): [openjtalkjs](https://github.com/keanu-thakalath/openjtalkjs)のブラウザ/WASMビルド
-- **完全クライアントサイド**: 推論サーバーやコンテナは不要。Open JTalk辞書(約100MB)+デフォルトHTSボイス(`mei_normal.htsvoice`)はnpmパッケージに同梱し、アプリのpublicディレクトリへコピーして配信するため外部ホストも不要。Kokoro ONNXモデルのみ初回実行時にHugging Face Hubから取得する
+- **完全クライアントサイド**: 推論サーバーやコンテナは不要。Open JTalk公式辞書tar.gz(約24MB)、Worker/WASM、デフォルトHTSボイスはjsDelivrから取得し、ブラウザ内で展開する。Kokoro ONNXモデルは初回実行時にHugging Face Hubから取得する
 
 本パッケージの構成(ビルド方式・パッケージ体裁・ライセンス)はkokoro-js本体([hexgrad/kokoro](https://github.com/hexgrad/kokoro)の`kokoro.js/`)に準拠している。主な違いは、kokoro-jsがNode/ブラウザ両対応(CJS+ESM+Web版の3出力)なのに対し、本パッケージはWorker + WASMのgrapheme-to-phonemeに依存する都合上**ブラウザ専用**(ESM単一出力)である点。
 
@@ -14,7 +14,7 @@
 - [現在のステータス](#現在のステータス)
 - [インストール](#インストール)
 - [使い方](#使い方)
-  - [辞書/ボイスの配置を個別指定する(オプション)](#辞書ボイスの配置を個別指定するオプション)
+  - [アセットを自己ホスト・個別指定する(オプション)](#アセットを自己ホスト個別指定するオプション)
 - [スクリプト](#スクリプト)
 - [テスト](#テスト)
 - [既知の制限](#既知の制限)
@@ -26,7 +26,7 @@
 [GitHub Pagesで公開しているデモページ](https://nerosui.github.io/kokoro-js-jp/)で、インストール不要・ブラウザだけで英語・日本語の音声合成を試せる(`demo/`、`.github/workflows/deploy-pages.yml`で自動デプロイ)。
 
 - 初回アクセス時: Kokoro-82Mモデル(数十MB〜、Hugging Face Hubから取得)のダウンロードが発生
-- 日本語を初めて使う際: Open JTalk辞書(約100MB)の追加ダウンロードが発生
+- 日本語を初めて使う際: Open JTalk公式辞書tar.gz(約24MB)をダウンロードし、ブラウザ内で約107MBへ展開
 - 入力したテキストは一切外部送信されず、音声合成はすべて端末内(ブラウザのWorker + WASM)で完結する
 
 ## 現在のステータス
@@ -42,8 +42,6 @@ CIでは以下を実行している(`.github/workflows/ci.yml`):
 
 ```bash
 npm install kokoro-js-jp
-# 日本語G2P用アセットをアプリの公開ディレクトリへコピー
-npx kokoro-js-jp-copy-assets public/kokoro-js-jp
 ```
 
 > [!NOTE]
@@ -58,17 +56,20 @@ import { KokoroJP } from "kokoro-js-jp";
 
 const tts = await KokoroJP.load({
   dtype: "q8", // kokoro-jsのモデル量子化設定(省略可)
-  // 上のcopy-assetsコマンドの出力を配信する公開URL。
-  japanese: { assetsUrl: "/kokoro-js-jp" },
+  // 本番では必ず公開した正確なバージョンへ固定する。
+  japanese: {
+    assetsUrl: "https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.0/dist",
+  },
 });
 
 const englishAudio = await tts.speak("Hello, world.", "af_heart");
-// 日本語音声を初めてspeak()した時点でOpen JTalk辞書(約100MB)を遅延フェッチする(英語のみの
-// 利用であればこのダウンロードは発生しない)。
+// 日本語音声を初めてspeak()した時点で約24MBの辞書tar.gzを遅延フェッチし、
+// Worker内で約100MBの辞書へストリーミング展開する。
 const japaneseAudio = await tts.speak("こんにちは", "jf_alpha");
 ```
 
-- `assetsUrl`は、ビルドツールがnpm依存内の約100MBのデータファイルを自動では公開出力へコピーしないため明示的に指定する。Vite/webpack/Next.js等でパッケージ本体が再バンドルされても、このURL契約は変わらない。
+- `assetsUrl`は、同じバージョンのnpmパッケージを配信するjsDelivrの`dist/`へ固定する。`@latest`やバージョン省略は、コードとWorker/WASMの不一致を招くため使用しない。
+- jsDelivrのWorkerは同一オリジンのBlob Workerから読み込む。厳格なCSPを使う場合は`worker-src blob:`と`script-src https://cdn.jsdelivr.net`、辞書・WASM・voice用に`connect-src https://cdn.jsdelivr.net`を許可するか、下記の自己ホスト方式を使う。
 - 英語だけを使う場合は`japanese`を省略でき、Open JTalk Workerも生成されない。
 - このパッケージはブラウザ専用である。SSRフレームワークではClient Componentまたはブラウザ側のコードからimportすること。モジュールのimport自体はWorkerを生成しないため、SSRビルド時の解析は可能。
 
@@ -86,36 +87,44 @@ const japaneseAudio = await tts.speak("こんにちは", "jf_alpha");
 
 Kokoro-82Mモデル自体は非対応言語のvoiceも同梱しているが、対応するg2pが無いため`resolveLang()`は`undefined`を返し、`speak()`は例外を投げる。
 
-### 辞書/ボイスの配置を個別指定する(オプション)
+### アセットを自己ホスト・個別指定する(オプション)
 
-通常は`assetsUrl`だけでよい。別々のCDNで配信する場合や`mei_normal.htsvoice`以外のHTSボイスを使う場合は、各URLを上書きできる:
+外部CDNを使わない場合は、npmパッケージ内の約25MBのブラウザアセットをpublicディレクトリへコピーする:
+
+```bash
+npx kokoro-js-jp-copy-assets public/kokoro-js-jp
+```
+
+```ts
+const tts = await KokoroJP.load({
+  japanese: { assetsUrl: "/kokoro-js-jp" },
+});
+```
+
+別々のCDNで配信する場合や`mei_normal.htsvoice`以外のHTSボイスを使う場合は、各URLを上書きできる:
 
 ```ts
 const tts = await KokoroJP.load({
   japanese: {
     assetsUrl: "https://example.com/kokoro-js-jp",
-    // *ディレクトリ*URL。openjtalkjsのブラウザランタイムが
-    // `${dicUrl}/sys.dic`・`${dicUrl}/matrix.bin`等8ファイルを個別にfetchする
-    // (tarball等のアーカイブURLは不可)。8ファイルの一覧はsrc/g2p/japanese.tsの
-    // JapaneseG2PConfigコメント、またはTHIRD_PARTY_NOTICES.mdを参照。
-    dicUrl: "https://example.com/openjtalk-dic",
+    dicArchiveUrl: "https://cdn.example.com/open_jtalk_dic_utf_8-1.11.tar.gz",
     // 単一の.htsvoiceファイルURL。
     voiceUrl: "https://example.com/my-voice.htsvoice",
-    // copy-assetsが出力するbrowser/worker.js。隣にWASMアセットが必要。
+    // browser/worker.js。隣にWASMラッパーとWASM本体が必要。
     workerUrl: "https://example.com/kokoro-js-jp/browser/worker.js",
   },
 });
 ```
 
 > [!NOTE]
-> `dicUrl`は個別ファイル8本を配信できる場所であれば何でもよい(自前のCDN、静的ホスティング等)。アーカイブ配信のみのホスト(GitHub Releasesの直リンク等)はそのままでは使えない点に注意([パッケージサイズについて](#パッケージサイズについて)参照)。
+> 従来の展開済み辞書を配信する場合に限り、`dicArchiveUrl`の代わりに、必要な8ファイルを置いたディレクトリURLを`dicUrl`へ指定できる。両方を同時には指定できない。
 
 ## スクリプト
 
 | コマンド | 説明 |
 | --- | --- |
-| `npm run build` | `rollup -c`(TypeScript直接バンドル、ESM単一出力+d.ts、kokoro-jsと同じnodeResolve+terser構成)でビルドした後、`scripts/copy-vendor.mjs`がvendorしているopenjtalkjsのworker/WASMアセットを、`scripts/fetch-openjtalk-dic-assets.mjs`がOpen JTalk辞書(約100MB)+公式辞書tar.gz+デフォルトHTSボイスを、それぞれバンドル後のコードが期待する相対パスで`dist/`にコピーする(辞書はローカルの`.cache/`に取得キャッシュを持つため、2回目以降のビルドでは再ダウンロードしない) |
-| `npx kokoro-js-jp-copy-assets <public-directory>` | 公開済みnpmパッケージから、辞書・HTS voice・Worker・WASMをconsumerアプリのpublicディレクトリへコピーする |
+| `npm run build` | コードをバンドルした後、Worker/WASM、SHA-256検証済みのOpen JTalk公式辞書tar.gz(約24MB)、デフォルトHTSボイスを`dist/`へ配置する。展開済み辞書はnpmへ重複収録しない |
+| `npx kokoro-js-jp-copy-assets <public-directory>` | 自己ホスト用に辞書tar.gz・HTS voice・Worker・WASMをconsumerアプリのpublicディレクトリへコピーする |
 | `npm run format` | `prettier --write .`(kokoro-jsと同じ`--print-width 1000`) |
 | `npm test` | `vitest run`(g2p・ボイステーブルの純粋関数テストのみ。ブラウザ/WASMは絡まない) |
 | `npm run test:e2e` | `playwright test`(実ブラウザでWorker + WASM + ONNXパイプラインを実行するe2eテスト。要`npm run build`済み・`npx playwright install chromium`済み。詳細は[テスト](#テスト)節参照) |
@@ -137,6 +146,7 @@ npm run test:e2e
 
 ## 既知の制限
 
+- **対応ブラウザ**: 日本語辞書の展開にWeb標準の`DecompressionStream("gzip")`を使う。これを実装していない古いブラウザでは日本語G2Pを初期化できないため、最新版のChrome・Edge・Firefox・Safariを使用する。
 - **Kokoro-82M ONNXモデルのrevision未固定**: `onnx-community/Kokoro-82M-v1.0-ONNX`はrevisionを固定せずHugging Face Hubから取得している。kokoro-js本体の`KokoroTTS.from_pretrained()`がrevision指定をサポートしていないため、本パッケージ側で固定することもできない。上流でモデルの中身が更新された場合、取得結果が変わりうる。モデル自体のライセンス・利用規約は[huggingface.co/hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)を参照(本リポジトリには転載していない)。
 - **`npm audit`の既知アラート**: `npm audit --omit=dev`は、`@huggingface/transformers`がNode向けに依存する`sharp`について[GHSA-f88m-g3jw-g9cj](https://github.com/advisories/GHSA-f88m-g3jw-g9cj)(high、現時点で上流の修正版なし)を報告する。本パッケージのブラウザTTS経路では`sharp`をimport・実行しないが、npm installされる依存であるため監査結果には現れる。上流で修正版が利用可能になり次第更新する。
 
@@ -146,14 +156,12 @@ Apache-2.0(kokoro-js本体、および本パッケージがportしている misa
 
 ## パッケージサイズについて
 
-Open JTalk辞書(主に`sys.dic`が約100MB)を`dist/`に同梱しているため、npmパッケージ自体が約130MBになる。展開済み辞書に加え、ブラウザ/CDN向けの公式辞書アーカイブ`dist/open_jtalk_dic_utf_8-1.11.tar.gz`(約24MB)も収録する。公開後はバージョンを固定した次のjsDelivr URLからCORS付きで取得できる:
+展開済み辞書(約107MB)はnpmパッケージへ収録せず、公式辞書アーカイブ`dist/open_jtalk_dic_utf_8-1.11.tar.gz`(約24MB)のみを収録する。Worker/WASM・voice・コードを含むnpmパッケージ全体は約25MBである。公開後はバージョンを固定した次のjsDelivr URLからCORS付きで取得できる:
 
 ```text
 https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.0/dist/open_jtalk_dic_utf_8-1.11.tar.gz
 ```
 
-現行の`KokoroJP.load()`は引き続き展開済み辞書ディレクトリを使用し、このtar.gzを直接は読まない。アーカイブはCDN配信およびブラウザ向けストリーミング展開ローダーで利用できる配布物として収録している。
+ブラウザWorkerはtar.gzのSHA-256とtarヘッダーを検証しながらgzipをストリーミング展開し、必要な8ファイルをWASMのファイルシステムへ直接書き込む。約107MBの展開済みtar全体をJavaScriptヒープへ保持しない。
 
-kokoro-js本体(ONNXモデルは同梱せず実行時にHugging Face Hubから取得)とは対照的だが、本パッケージのdicUrlは*ディレクトリ*(個別ファイルを`${dicUrl}/sys.dic`のように1本ずつfetchする形)を要求するため、この用途にHugging Face Hubのようなキャッシュ付き実行時取得はそのまま使えない。
-
-付属の`kokoro-js-jp-copy-assets`でアプリの公開ディレクトリへ配置する。日本語辞書のロード自体は`speak()`で日本語voiceIdを初めて使った時点まで遅延するため、英語のみの利用ではダウンロードもメモリ確保も発生しない。
+日本語辞書の取得・展開は`speak()`で日本語voiceIdを初めて使った時点まで遅延するため、英語のみの利用ではダウンロードもメモリ確保も発生しない。ブラウザ内では最終的にOpen JTalkが約100MBの辞書を保持するため、実行時メモリ自体が24MBになるわけではない。

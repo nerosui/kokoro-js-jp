@@ -40,7 +40,8 @@ interface NJDNode {
 }
 
 type BrowserConfigure = {
-    dicUrl: string;
+    dicUrl?: string;
+    dicArchiveUrl?: string;
     voiceUrl: string;
 };
 

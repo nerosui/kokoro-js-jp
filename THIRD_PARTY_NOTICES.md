@@ -45,11 +45,12 @@ The 8 dictionary files openjtalkjs's g2p runtime reads at startup (`sys.dic`, `m
 `char.bin`, `unk.dic`, `left-id.def`, `right-id.def`, `pos-id.def`, `rewrite.def`), from
 the Open JTalk project's official SourceForge release
 [`open_jtalk_dic_utf_8-1.11.tar.gz`](https://sourceforge.net/projects/open-jtalk/files/Dictionary/open_jtalk_dic-1.11/open_jtalk_dic_utf_8-1.11.tar.gz/download).
-The verified archive is published at `dist/open_jtalk_dic_utf_8-1.11.tar.gz`, and its 8
-runtime files are also extracted into `dist/openjtalk-dic/`. Three
+The verified archive is published at `dist/open_jtalk_dic_utf_8-1.11.tar.gz`; its 8 runtime
+files are streamed directly into the browser's WASM filesystem rather than duplicated in
+the npm package. Three
 Modified-BSD copyright notices apply, all bundled in the tarball's own `COPYING` file (also
-copied to `dist/openjtalk-dic/COPYING`): NAIST Japanese Dictionary (Copyright (c) 2009, Nara
-Institute of Science and Technology), UniDic (Copyright (c) 2011-2017, The UniDic Consortium),
+reproduced below): NAIST Japanese Dictionary (Copyright (c) 2009, Nara Institute of Science
+and Technology), UniDic (Copyright (c) 2011-2017, The UniDic Consortium),
 and Open JTalk itself (Copyright (c) 2008-2016, Nagoya Institute of Technology / HTS Working
 Group). See [Modified BSD (Open JTalk dictionary)](#modified-bsd-open-jtalk-dictionary) below.
 
@@ -307,8 +308,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ## Modified BSD (Open JTalk dictionary)
 
-Reproduced verbatim from `COPYING` inside `open_jtalk_dic_utf_8-1.11.tar.gz` (also present at
-`dist/openjtalk-dic/COPYING` in this package) — three notices covering the dictionary's lineage.
+Reproduced verbatim from `COPYING` inside `open_jtalk_dic_utf_8-1.11.tar.gz` — three notices
+covering the dictionary's lineage.
 
 ```
 Copyright (c) 2009, Nara Institute of Science and Technology, Japan.

@@ -2639,6 +2639,8 @@ var DIC_FILES = [
   "pos-id.def",
   "rewrite.def"
 ];
+var DIC_ARCHIVE_SHA256 = "33e9cd251bc41aa2bd7ca36f57abbf61eae3543ca25ca892ae345e394cb10549";
+var textDecoder = new TextDecoder();
 function ensureOk(rc, fn) {
   if (typeof rc !== "number" || rc < 0) {
     throw new Error(`openjtalkjs wasm bridge call failed in ${fn} (code=${rc})`);
@@ -2655,6 +2657,124 @@ async function fetchBytes(url) {
   }
   return new Uint8Array(await response.arrayBuffer());
 }
+function readTarString(header, offset, length) {
+  let end = offset;
+  const limit = offset + length;
+  while (end < limit && header[end] !== 0) end++;
+  return textDecoder.decode(header.subarray(offset, end));
+}
+function readTarOctal(header, offset, length) {
+  const value = readTarString(header, offset, length).trim().replace(/\0.*$/, "");
+  if (!/^[0-7]+$/.test(value)) throw new Error(`Invalid tar octal field: ${JSON.stringify(value)}`);
+  return Number.parseInt(value, 8);
+}
+function isZeroBlock(header) {
+  return header.every((byte) => byte === 0);
+}
+function verifyTarHeader(header) {
+  const expected = readTarOctal(header, 148, 8);
+  let actual = 0;
+  for (let i = 0; i < header.length; i++) {
+    actual += i >= 148 && i < 156 ? 32 : header[i];
+  }
+  if (actual !== expected) throw new Error(`Invalid tar header checksum: expected ${expected}, got ${actual}`);
+}
+function createStreamReader(stream) {
+  const reader = stream.getReader();
+  let chunk = new Uint8Array(0);
+  let offset = 0;
+  async function ensureChunk() {
+    while (offset >= chunk.length) {
+      const next = await reader.read();
+      if (next.done) return false;
+      chunk = next.value;
+      offset = 0;
+    }
+    return true;
+  }
+  return {
+    async readExact(length) {
+      const output = new Uint8Array(length);
+      let written = 0;
+      while (written < length) {
+        if (!await ensureChunk()) throw new Error(`Unexpected end of tar stream (needed ${length - written} more bytes)`);
+        const count = Math.min(length - written, chunk.length - offset);
+        output.set(chunk.subarray(offset, offset + count), written);
+        offset += count;
+        written += count;
+      }
+      return output;
+    },
+    async consume(length, onChunk) {
+      let remaining = length;
+      while (remaining > 0) {
+        if (!await ensureChunk()) throw new Error(`Unexpected end of tar stream (needed ${remaining} more bytes)`);
+        const count = Math.min(remaining, chunk.length - offset);
+        const piece = chunk.subarray(offset, offset + count);
+        if (onChunk) onChunk(piece);
+        offset += count;
+        remaining -= count;
+      }
+    }
+  };
+}
+async function verifyArchiveHash(data) {
+  if (!globalThis.crypto?.subtle) return;
+  const digest = new Uint8Array(await globalThis.crypto.subtle.digest("SHA-256", data));
+  const actual = Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+  if (actual !== DIC_ARCHIVE_SHA256) {
+    throw new Error(`Open JTalk dictionary archive checksum mismatch: expected ${DIC_ARCHIVE_SHA256}, got ${actual}`);
+  }
+}
+async function installDictionaryArchive(core, archiveUrl, dicRoot) {
+  if (typeof DecompressionStream !== "function") {
+    throw new Error("This browser does not support DecompressionStream('gzip'), which is required to load the Open JTalk dictionary archive.");
+  }
+  const compressed = await fetchBytes(archiveUrl);
+  await verifyArchiveHash(compressed);
+  const decompressed = new Blob([compressed]).stream().pipeThrough(new DecompressionStream("gzip"));
+  const stream = createStreamReader(decompressed);
+  const expectedFiles = new Set(DIC_FILES);
+  const installedFiles = new Set();
+  let zeroBlocks = 0;
+  for (;;) {
+    const header = await stream.readExact(512);
+    if (isZeroBlock(header)) {
+      zeroBlocks++;
+      if (zeroBlocks === 2) break;
+      continue;
+    }
+    zeroBlocks = 0;
+    verifyTarHeader(header);
+    const name = readTarString(header, 0, 100);
+    const prefix = readTarString(header, 345, 155);
+    const path = prefix ? `${prefix}/${name}` : name;
+    const basename = path.split("/").filter(Boolean).at(-1) ?? "";
+    const size = readTarOctal(header, 124, 12);
+    const type = header[156];
+    const shouldInstall = (type === 0 || type === 48) && expectedFiles.has(basename);
+    if (shouldInstall) {
+      if (installedFiles.has(basename)) throw new Error(`Duplicate dictionary file in tar archive: ${basename}`);
+      const file = core.FS.open(`${dicRoot}/${basename}`, "w");
+      let position = 0;
+      try {
+        await stream.consume(size, (piece) => {
+          core.FS.write(file, piece, 0, piece.length, position);
+          position += piece.length;
+        });
+      } finally {
+        core.FS.close(file);
+      }
+      installedFiles.add(basename);
+    } else {
+      await stream.consume(size);
+    }
+    const padding = (512 - size % 512) % 512;
+    if (padding) await stream.consume(padding);
+  }
+  const missing = DIC_FILES.filter((file) => !installedFiles.has(file));
+  if (missing.length) throw new Error(`Open JTalk dictionary archive is missing required files: ${missing.join(", ")}`);
+}
 async function createOpenJTalkModule2(moduleArg = {}) {
   const core = await openjtalk_wasm_default(moduleArg);
   const ojtConfigure = core.cwrap("ojt_configure", "number", ["string", "string"]);
@@ -2663,7 +2783,7 @@ async function createOpenJTalkModule2(moduleArg = {}) {
   const ojtSynthesize = core.cwrap("ojt_synthesize", "number", ["string", "string", "number", "number", "number"]);
   const ojtRunFrontend = core.cwrap("ojt_run_frontend", "number", ["string", "number", "number"]);
   return {
-    async configure(dicUrl, voiceUrl) {
+    async configure(dicUrl, voiceUrl, dicArchiveUrl) {
       const dicRoot = "/ojt/dic";
       const voicePath = "/ojt/voice.htsvoice";
       try {
@@ -2674,9 +2794,13 @@ async function createOpenJTalkModule2(moduleArg = {}) {
         core.FS.mkdir(dicRoot);
       } catch {
       }
-      for (const file of DIC_FILES) {
-        const data = await fetchBytes(`${dicUrl.replace(/\/$/, "")}/${file}`);
-        core.FS.writeFile(`${dicRoot}/${file}`, data);
+      if (dicArchiveUrl) {
+        await installDictionaryArchive(core, dicArchiveUrl, dicRoot);
+      } else {
+        for (const file of DIC_FILES) {
+          const data = await fetchBytes(`${dicUrl.replace(/\/$/, "")}/${file}`);
+          core.FS.writeFile(`${dicRoot}/${file}`, data);
+        }
       }
       const voiceData = await fetchBytes(voiceUrl);
       core.FS.writeFile(voicePath, voiceData);
