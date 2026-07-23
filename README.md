@@ -142,7 +142,7 @@ npm run test:e2e
 
 - **対応ブラウザ**: 日本語辞書の展開にWeb標準の`DecompressionStream("gzip")`を使う。これを実装していない古いブラウザでは日本語G2Pを初期化できないため、最新版のChrome・Edge・Firefox・Safariを使用する。
 - **Kokoro-82M ONNXモデルのrevision未固定**: `onnx-community/Kokoro-82M-v1.0-ONNX`はrevisionを固定せずHugging Face Hubから取得している。kokoro-js本体の`KokoroTTS.from_pretrained()`がrevision指定をサポートしていないため、本パッケージ側で固定することもできない。上流でモデルの中身が更新された場合、取得結果が変わりうる。モデル自体のライセンス・利用規約は[huggingface.co/hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M)を参照(本リポジトリには転載していない)。
-- **`npm audit`の既知アラート**: `npm audit --omit=dev`は、`@huggingface/transformers`がNode向けに依存する`sharp`について[GHSA-f88m-g3jw-g9cj](https://github.com/advisories/GHSA-f88m-g3jw-g9cj)(high、現時点で上流の修正版なし)を報告する。本パッケージのブラウザTTS経路では`sharp`をimport・実行しないが、npm installされる依存であるため監査結果には現れる。上流で修正版が利用可能になり次第更新する。
+- **`sharp`の脆弱性への対応**: `@huggingface/transformers`はNode向けに`sharp`(`^0.34.5`)へ依存しており、`0.35.0`未満には[GHSA-f88m-g3jw-g9cj](https://github.com/advisories/GHSA-f88m-g3jw-g9cj)(high)が存在する。本パッケージのブラウザTTS経路では`sharp`をimport・実行しないが、`@huggingface/transformers`側がまだ`sharp`を`0.35.x`系へ追従していないため、`package.json`の`overrides`で`sharp`を`^0.35.3`へ強制解決して回避している。上流(`@huggingface/transformers`)が追従次第、このoverrideは不要になる。
 
 ## ライセンス
 
