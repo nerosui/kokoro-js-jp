@@ -15,9 +15,28 @@ test("bundled dictionary archive + voice are reachable", async ({ request }) => 
   expect(voiceRes.ok(), "GET /openjtalk-voice.htsvoice").toBeTruthy();
 });
 
-test("full pipeline: English + Japanese synthesis, unsupported voiceId", async ({ page }) => {
+test("full pipeline: default CDN assets, English + Japanese synthesis, unsupported voiceId", async ({ context, page }) => {
   page.on("console", (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
   page.on("pageerror", (err) => console.log(`[browser:pageerror] ${err.message}`));
+
+  // Keep the test deterministic before the new package version is published:
+  // requests still use the exact default jsDelivr URL emitted by dist/index.js,
+  // but Playwright fulfills those CDN requests from the freshly built dist/.
+  // This exercises the cross-origin blob Worker and catches a stale/missing
+  // default without depending on an already-published npm release.
+  const defaultAssetRequests: string[] = [];
+  await context.route("https://cdn.jsdelivr.net/npm/kokoro-js-jp@*/dist/**", async (route) => {
+    const remoteUrl = new URL(route.request().url());
+    const assetPath = remoteUrl.pathname.split("/dist/")[1];
+    if (!assetPath) throw new Error(`Unexpected default asset URL: ${remoteUrl}`);
+    defaultAssetRequests.push(assetPath);
+    const localResponse = await context.request.get(`http://127.0.0.1:4174/${assetPath}`);
+    if (!localResponse.ok()) throw new Error(`Missing built asset for ${remoteUrl}: HTTP ${localResponse.status()}`);
+    await route.fulfill({
+      response: localResponse,
+      headers: { ...localResponse.headers(), "access-control-allow-origin": "*" },
+    });
+  });
   await page.goto("/index.html");
 
   // Everything happens in one page.evaluate/one KokoroJP.load() call: Cache
@@ -29,9 +48,6 @@ test("full pipeline: English + Japanese synthesis, unsupported voiceId", async (
     const { KokoroJP } = await import("/consumer.js");
     const tts = await KokoroJP.load({
       dtype: "q4", // smallest quantization: this only needs to prove the pipeline runs, not audio quality
-      // A separate origin exercises the same blob-bootstrap Worker path used
-      // by the documented jsDelivr configuration.
-      japanese: { assetsUrl: "http://127.0.0.1:4174" },
     });
 
     const summarize = (audio: { audio: Float32Array; sampling_rate: number }) => ({
@@ -62,4 +78,13 @@ test("full pipeline: English + Japanese synthesis, unsupported voiceId", async (
   expect(result.ja.hasSignal, "Japanese audio should not be silence").toBe(true);
 
   expect(result.unsupportedError).toContain("unsupported voiceId");
+  expect(defaultAssetRequests).toEqual(
+    expect.arrayContaining([
+      "browser/worker.js",
+      "open_jtalk_dic_utf_8-1.11.tar.gz",
+      "openjtalk-voice.htsvoice",
+      "openjtalk-wasm-wrapper-D6E3BSJO.js",
+      "openjtalk-wasm.wasm",
+    ]),
+  );
 });

@@ -54,13 +54,7 @@ npm install kokoro-js-jp
 ```ts
 import { KokoroJP } from "kokoro-js-jp";
 
-const tts = await KokoroJP.load({
-  dtype: "q8", // kokoro-jsのモデル量子化設定(省略可)
-  // 本番では必ず公開した正確なバージョンへ固定する。
-  japanese: {
-    assetsUrl: "https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.0/dist",
-  },
-});
+const tts = await KokoroJP.load();
 
 const englishAudio = await tts.speak("Hello, world.", "af_heart");
 // 日本語音声を初めてspeak()した時点で約24MBの辞書tar.gzを遅延フェッチし、
@@ -68,9 +62,9 @@ const englishAudio = await tts.speak("Hello, world.", "af_heart");
 const japaneseAudio = await tts.speak("こんにちは", "jf_alpha");
 ```
 
-- `assetsUrl`は、同じバージョンのnpmパッケージを配信するjsDelivrの`dist/`へ固定する。`@latest`やバージョン省略は、コードとWorker/WASMの不一致を招くため使用しない。
+- `japanese`を省略すると、このパッケージと同じバージョンへ固定されたjsDelivrの`dist/`を自動的に使用する。`0.1.1`では`https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.1/dist`となる。
 - jsDelivrのWorkerは同一オリジンのBlob Workerから読み込む。厳格なCSPを使う場合は`worker-src blob:`と`script-src https://cdn.jsdelivr.net`、辞書・WASM・voice用に`connect-src https://cdn.jsdelivr.net`を許可するか、下記の自己ホスト方式を使う。
-- 英語だけを使う場合は`japanese`を省略でき、Open JTalk Workerも生成されない。
+- 辞書・Worker・WASM・voiceは日本語voiceIdを初めて使うまで取得されないため、英語のみの利用では追加ダウンロードやOpen JTalk Workerの生成は発生しない。日本語を明示的に無効化する場合は`japanese: false`を指定できる。
 - このパッケージはブラウザ専用である。SSRフレームワークではClient Componentまたはブラウザ側のコードからimportすること。モジュールのimport自体はWorkerを生成しないため、SSRビルド時の解析は可能。
 
 `voiceId`はkokoro-js本体と同じ、素のKokoro-82M voice idをそのまま使う(別名レイヤーは持たない)。1文字目が言語、2文字目が性別を表す:
@@ -159,7 +153,7 @@ Apache-2.0(kokoro-js本体、および本パッケージがportしている misa
 展開済み辞書(約107MB)はnpmパッケージへ収録せず、公式辞書アーカイブ`dist/open_jtalk_dic_utf_8-1.11.tar.gz`(約24MB)のみを収録する。Worker/WASM・voice・コードを含むnpmパッケージ全体は約25MBである。公開後はバージョンを固定した次のjsDelivr URLからCORS付きで取得できる:
 
 ```text
-https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.0/dist/open_jtalk_dic_utf_8-1.11.tar.gz
+https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.1/dist/open_jtalk_dic_utf_8-1.11.tar.gz
 ```
 
 ブラウザWorkerはtar.gzのSHA-256とtarヘッダーを検証しながらgzipをストリーミング展開し、必要な8ファイルをWASMのファイルシステムへ直接書き込む。約107MBの展開済みtar全体をJavaScriptヒープへ保持しない。

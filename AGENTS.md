@@ -40,11 +40,12 @@ current setup, not a bug to "fix" by adding retries or shortening timeouts.
    official archive's pinned SHA-256 and the voice response before involving WASM. If this
    fails, check the `assetsUrl` mapping in `src/g2p/japanese.ts`, `scripts/copy-assets.mjs`,
    and `scripts/fetch-openjtalk-dic-assets.mjs` first.
-2. **Full pipeline** — one `page.evaluate()`, one `KokoroJP.load()` (kept to one to avoid
-   re-downloading the model 3x in one run): a second local origin exercises the jsDelivr-like
-   cross-origin Worker bootstrap, streams the tar.gz into the WASM filesystem, synthesizes
-   English and Japanese, and checks an unsupported-voiceId error. Asserts real non-silent
-   audio came back (sample count, 24kHz sample rate, non-zero signal), not just "didn't throw."
+2. **Full pipeline** — one `page.evaluate()`, one zero-config `KokoroJP.load()` (kept to one
+   to avoid re-downloading the model 3x in one run): Playwright intercepts the exact default
+   jsDelivr URLs and fulfills them from the freshly built `dist/`, exercising the
+   cross-origin Worker bootstrap before publication. It streams the tar.gz into the WASM
+   filesystem, synthesizes English and Japanese, and checks an unsupported-voiceId error.
+   Assertions require real non-silent audio (sample count, 24kHz sample rate, non-zero signal).
 
 ## Debugging a failure
 
