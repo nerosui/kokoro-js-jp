@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("../src/g2p/japanese.js", () => ({
-  DEFAULT_JAPANESE_ASSETS_URL: "https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.1/dist",
+  DEFAULT_JAPANESE_ASSETS_URL: "https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.2.0/dist",
   loadJapaneseG2P: mocks.loadJapaneseG2P,
 }));
 

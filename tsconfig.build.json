@@ -2,6 +2,8 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": "src",
+    // Only the test-side tsconfig needs allowJs; the published build stays .ts-only.
+    "allowJs": false,
     "noEmit": false
   },
   "include": ["src"]

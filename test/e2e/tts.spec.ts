@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+
+// Read rather than `import ... from "../../package.json"`: Playwright's TS loader
+// requires an import attribute for JSON, which the vitest/tsc side does not use.
+const packageJson = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
 
 const DIC_ARCHIVE_PATH = "/open_jtalk_dic_utf_8-1.11.tar.gz";
 const DIC_ARCHIVE_SHA256 = "33e9cd251bc41aa2bd7ca36f57abbf61eae3543ca25ca892ae345e394cb10549";
@@ -10,9 +15,41 @@ const DIC_ARCHIVE_SHA256 = "33e9cd251bc41aa2bd7ca36f57abbf61eae3543ca25ca892ae34
 test("bundled dictionary archive + voice are reachable", async ({ request }) => {
   const archiveRes = await request.get(DIC_ARCHIVE_PATH);
   expect(archiveRes.ok(), `GET ${DIC_ARCHIVE_PATH}`).toBeTruthy();
-  expect(createHash("sha256").update(await archiveRes.body()).digest("hex"), `${DIC_ARCHIVE_PATH} SHA-256`).toBe(DIC_ARCHIVE_SHA256);
+  expect(
+    createHash("sha256")
+      .update(await archiveRes.body())
+      .digest("hex"),
+    `${DIC_ARCHIVE_PATH} SHA-256`,
+  ).toBe(DIC_ARCHIVE_SHA256);
   const voiceRes = await request.get("/openjtalk-voice.htsvoice");
   expect(voiceRes.ok(), "GET /openjtalk-voice.htsvoice").toBeTruthy();
+});
+
+// The CDN entry (package.json "jsdelivr"/"unpkg") is what a raw
+// `<script type="module">` imports, so it must load in a browser with no import map
+// and no bundler. Cheap on purpose — no KokoroJP.load(), so no model download:
+// what can actually regress here is the bundle's self-containedness (a bare
+// specifier leaking back in, or kokoro-js failing to inline), which fails at import.
+test("CDN entry imports in a bare browser page without an import map", async ({ page }) => {
+  page.on("console", (msg) => console.log(`[browser:${msg.type()}] ${msg.text()}`));
+  page.on("pageerror", (err) => console.log(`[browser:pageerror] ${err.message}`));
+
+  await page.goto("/cdn.html");
+  const result = await page.evaluate(async () => {
+    // Non-literal specifier: this path is a served build output, not resolvable
+    // from the repo at typecheck time.
+    const specifier = "/kokoro-jp.web.js";
+    const mod = await import(specifier);
+    return {
+      exports: Object.keys(mod).sort(),
+      defaultAssetsUrl: mod.DEFAULT_JAPANESE_ASSETS_URL,
+      loadIsFunction: typeof mod.KokoroJP?.load === "function",
+    };
+  });
+
+  expect(result.exports).toEqual(["DEFAULT_JAPANESE_ASSETS_URL", "DEFAULT_VOICE_ID", "KokoroJP", "resolveLang"]);
+  expect(result.loadIsFunction, "KokoroJP.load should be callable").toBe(true);
+  expect(result.defaultAssetsUrl).toBe(`https://cdn.jsdelivr.net/npm/kokoro-js-jp@${packageJson.version}/dist`);
 });
 
 test("full pipeline: default CDN assets, English + Japanese synthesis, unsupported voiceId", async ({ context, page }) => {
@@ -78,13 +115,5 @@ test("full pipeline: default CDN assets, English + Japanese synthesis, unsupport
   expect(result.ja.hasSignal, "Japanese audio should not be silence").toBe(true);
 
   expect(result.unsupportedError).toContain("unsupported voiceId");
-  expect(defaultAssetRequests).toEqual(
-    expect.arrayContaining([
-      "browser/worker.js",
-      "open_jtalk_dic_utf_8-1.11.tar.gz",
-      "openjtalk-voice.htsvoice",
-      "openjtalk-wasm-wrapper-D6E3BSJO.js",
-      "openjtalk-wasm.wasm",
-    ]),
-  );
+  expect(defaultAssetRequests).toEqual(expect.arrayContaining(["browser/worker.js", "open_jtalk_dic_utf_8-1.11.tar.gz", "openjtalk-voice.htsvoice", "openjtalk-wasm-wrapper-D6E3BSJO.js", "openjtalk-wasm.wasm"]));
 });

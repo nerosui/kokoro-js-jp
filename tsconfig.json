@@ -10,6 +10,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
+    // test/cdn-entry.test.ts imports rollup.config.js to assert the build actually
+    // emits the CDN entry declared in package.json. checkJs stays off, so the
+    // plain-JS config is inferred, not type-checked.
+    "allowJs": true,
     "isolatedModules": true,
     "noUncheckedIndexedAccess": true,
     "noEmit": true
