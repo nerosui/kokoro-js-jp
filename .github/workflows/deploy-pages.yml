@@ -1,15 +1,21 @@
 name: Deploy demo to GitHub Pages
 
+# The demo is now 100% CDN-driven: demo/main.js imports the published
+# dist/kokoro-jp.web.js from jsDelivr and lets DEFAULT_JAPANESE_ASSETS_URL pull the
+# dictionary/worker/WASM from the same versioned directory. So there is nothing to
+# build or copy here — the site is three static files.
+#
+# Consequence: the deployed demo tracks the *published* version, not main. A change
+# under src/ only reaches the demo once that version is on npm, which is why this
+# workflow also runs on `release: published` (and no longer on src/ pushes).
 on:
   push:
     branches: [main]
     paths:
       - "demo/**"
-      - "src/**"
-      - "scripts/**"
-      - "rollup.config.js"
-      - "package.json"
       - ".github/workflows/deploy-pages.yml"
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -26,24 +32,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-      - uses: actions/cache@v4
-        with:
-          path: .cache/openjtalk-assets
-          key: openjtalk-assets-${{ hashFiles('scripts/fetch-openjtalk-dic-assets.mjs') }}
-      - run: npm ci
-      # Builds dist/ (bundle + vendored openjtalkjs worker/WASM + the Open
-      # JTalk dictionary archive/voice, ~25MB) — same build the npm package ships,
-      # reused here so the demo runs the real thing, not a mock.
-      - run: npm run build
       - name: Assemble site
         run: |
           mkdir -p _site
           cp demo/index.html demo/style.css demo/main.js _site/
-          cp -r dist _site/dist
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

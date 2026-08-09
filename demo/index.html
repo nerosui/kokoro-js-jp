@@ -12,18 +12,11 @@
 
     <link rel="stylesheet" href="./style.css" />
 
-    <!-- dist/index.js (the built package, copied alongside this page — see
-         .github/workflows/deploy-pages.yml) has a bare `import ... from "kokoro-js"`,
-         left external on purpose (see THIRD_PARTY_NOTICES.md / README). A raw
-         browser page needs an import map to resolve it; a real consumer's
-         bundler would do this from node_modules instead. -->
-    <script type="importmap">
-      {
-        "imports": {
-          "kokoro-js": "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js"
-        }
-      }
-    </script>
+    <!-- No import map: main.js imports the package's CDN entry
+         (package.json "jsdelivr" -> dist/kokoro-jp.web.js), which has kokoro-js
+         bundled in. This page is therefore a plain static file with no build
+         step, and it exercises the exact jsDelivr URLs the README documents. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   </head>
   <body>
     <svg class="ensou" viewBox="0 0 200 200" aria-hidden="true">

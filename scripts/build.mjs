@@ -24,10 +24,12 @@ const rootDir = path.resolve(fileURLToPath(import.meta.url), "../..");
 
 rmSync(path.join(rootDir, "dist"), { recursive: true, force: true });
 
-const bundle = await rollup(rollupOptions);
-await bundle.write(rollupOptions.output);
-await bundle.close();
-console.log(`build: created ${rollupOptions.output.file}`);
+for (const options of rollupOptions) {
+  const bundle = await rollup(options);
+  await bundle.write(options.output);
+  await bundle.close();
+  console.log(`build: created ${options.output.file}`);
+}
 
 execFileSync(process.execPath, [path.join(rootDir, "scripts/copy-vendor.mjs")], { stdio: "inherit" });
 execFileSync(process.execPath, [path.join(rootDir, "scripts/fetch-openjtalk-dic-assets.mjs")], { stdio: "inherit" });

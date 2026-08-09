@@ -11,7 +11,7 @@ import type { NJDNode } from "../vendor/openjtalk/browser.js";
 import { hiraganaWordToPhonemes, PUNCT } from "./hepburn.js";
 import { configureWorker, runFrontendAsync } from "./worker-client.js";
 
-export const DEFAULT_JAPANESE_ASSETS_URL = "https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.1/dist";
+export const DEFAULT_JAPANESE_ASSETS_URL = "https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.2.0/dist";
 
 export type JapaneseG2PConfig = {
   /**

@@ -1,7 +1,15 @@
-// Demo page for kokoro-js-jp — see .github/workflows/deploy-pages.yml for how
-// ./dist/index.js (referenced below) gets built and placed alongside this
-// file before deploying to GitHub Pages. Not part of the npm package itself.
-import { KokoroJP } from "./dist/index.js";
+// Demo page for kokoro-js-jp. Not part of the npm package itself.
+//
+// This page is deliberately 100% CDN-driven: no bundler, no import map, and no
+// copy of dist/ deployed beside it (see .github/workflows/deploy-pages.yml).
+// It imports the published CDN entry — package.json's "jsdelivr" field, i.e.
+// dist/kokoro-jp.web.js, which has kokoro-js bundled in — so that a broken
+// jsDelivr layout shows up here instead of only in a consumer's app.
+//
+// The version below is pinned and must match package.json (test/cdn-entry.test.ts
+// enforces that). Because it is pinned, the demo only picks up a change to src/
+// after that version is actually published to npm.
+import { KokoroJP } from "https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.2.0/dist/kokoro-jp.web.js";
 
 // Full English voice list kokoro-js ships (node_modules/kokoro-js/voices/af_*
 // etc.) and the Japanese voices this package wires up (see src/voices.ts's

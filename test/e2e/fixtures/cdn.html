@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>kokoro-js-jp CDN entry host page</title>
+    <!-- Deliberately NO import map, unlike index.html: dist/kokoro-jp.web.js exists
+         precisely so a raw <script type="module"> from jsDelivr/unpkg works without
+         one. If a bare specifier ever leaks back into that bundle, importing it here
+         fails instead of silently working via index.html's map. -->
+  </head>
+  <body>
+    <!-- Intentionally empty: the test imports /kokoro-jp.web.js, served from dist/. -->
+  </body>
+</html>

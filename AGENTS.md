@@ -61,6 +61,12 @@ there, not in the Playwright assertion message.
 
 ### The bare-specifier gotcha
 
+This applies to `dist/index.js` (the npm entry) only. The second output,
+`dist/kokoro-jp.web.js` (the CDN entry — `package.json`'s `jsdelivr`/`unpkg`), inlines
+kokoro-js's own dependency-free browser build and has no bare imports at all; that is the
+whole point of it, and `test/e2e/fixtures/cdn.html` is deliberately import-map-free so the
+"CDN entry imports in a bare browser page" test fails if a bare specifier ever leaks in.
+
 `dist/index.js` has `import ... from "kokoro-js"` — left as a bare external import on
 purpose (`rollup.config.js`'s `external: [...]`). The e2e server first bundles the package
 through its public npm entry as `/consumer.js`; kokoro-js remains external so the raw browser

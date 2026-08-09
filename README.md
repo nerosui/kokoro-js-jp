@@ -6,13 +6,20 @@
 - **日本語G2P**(読み仮名→音素変換): [openjtalkjs](https://github.com/keanu-thakalath/openjtalkjs)のブラウザ/WASMビルド
 - **完全クライアントサイド**: 推論サーバーやコンテナは不要。Open JTalk公式辞書tar.gz(約24MB)、Worker/WASM、デフォルトHTSボイスはjsDelivrから取得し、ブラウザ内で展開する。Kokoro ONNXモデルは初回実行時にHugging Face Hubから取得する
 
-本パッケージの構成(ビルド方式・パッケージ体裁・ライセンス)はkokoro-js本体([hexgrad/kokoro](https://github.com/hexgrad/kokoro)の`kokoro.js/`)に準拠している。主な違いは、kokoro-jsがNode/ブラウザ両対応(CJS+ESM+Web版の3出力)なのに対し、本パッケージはWorker + WASMのgrapheme-to-phonemeに依存する都合上**ブラウザ専用**(ESM単一出力)である点。
+本パッケージの構成(ビルド方式・パッケージ体裁・ライセンス)はkokoro-js本体([hexgrad/kokoro](https://github.com/hexgrad/kokoro)の`kokoro.js/`)に準拠している。主な違いは、kokoro-jsがNode/ブラウザ両対応(CJS+ESM+Web版の3出力)なのに対し、本パッケージはWorker + WASMのgrapheme-to-phonemeに依存する都合上**ブラウザ専用**である点。出力はkokoro-jsと同じくバンドラ向けとCDN向けの2つのESMを持つ:
+
+| 出力                    | package.jsonのフィールド | 用途                                                                                                   |
+| ----------------------- | ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `dist/index.js`         | `exports`                | npm/バンドラ向け。`kokoro-js`はexternalのまま(consumer側のnode_modulesから解決される)                  |
+| `dist/kokoro-jp.web.js` | `jsdelivr` / `unpkg`     | CDN向け。`kokoro-js`を内包した自己完結ビルドで、素の`<script type="module">`からimport mapなしで使える |
 
 ## 目次
 
 - [デモ](#デモ)
 - [現在のステータス](#現在のステータス)
 - [インストール](#インストール)
+  - [CDNから直接使う(ビルド不要)](#cdnから直接使うビルド不要)
+  - [npmからインストールする](#npmからインストールする)
 - [使い方](#使い方)
   - [アセットを自己ホスト・個別指定する(オプション)](#アセットを自己ホスト個別指定するオプション)
 - [スクリプト](#スクリプト)
@@ -24,6 +31,8 @@
 ## デモ
 
 [GitHub Pagesで公開しているデモページ](https://nerosui.github.io/kokoro-js-jp/)で、インストール不要・ブラウザだけで英語・日本語の音声合成を試せる(`demo/`、`.github/workflows/deploy-pages.yml`で自動デプロイ)。
+
+デモ自体もCDN駆動で、バンドラもimport mapも使わない静的3ファイル(`index.html`/`style.css`/`main.js`)である。npmへ公開済みの`dist/kokoro-jp.web.js`をjsDelivrからimportし、辞書・Worker・WASM・voiceも同じバージョンの`dist/`から取得する。したがってデモが動いていることは、READMEに書かれたCDN配信レイアウトがそのまま動いていることの確認になる(裏返しに、デモは**公開済みバージョン**を追随するため、`main`への変更はnpm公開後に反映される)。
 
 - 初回アクセス時: Kokoro-82Mモデル(数十MB〜、Hugging Face Hubから取得)のダウンロードが発生
 - 日本語を初めて使う際: Open JTalk公式辞書tar.gz(約24MB)をダウンロードし、ブラウザ内で約107MBへ展開
@@ -39,6 +48,30 @@ CIでは以下を実行している(`.github/workflows/ci.yml`):
 - 公開entryをconsumerとして再バンドルした実ブラウザe2e
 
 ## インストール
+
+### CDNから直接使う(ビルド不要)
+
+`npm install`もバンドラも不要。`<script type="module">`からjsDelivrのCDNエントリを直接importできる:
+
+```html
+<script type="module">
+  import { KokoroJP } from "https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.2.0/dist/kokoro-jp.web.js";
+
+  const tts = await KokoroJP.load();
+  const audio = await tts.speak("こんにちは", "jf_alpha");
+  new Audio(URL.createObjectURL(audio.toBlob())).play();
+</script>
+```
+
+- CDNエントリ(`dist/kokoro-jp.web.js`、`package.json`の`jsdelivr`/`unpkg`)は`kokoro-js`を内包した自己完結ビルド(約2.1MB)である。素のブラウザで**import mapは不要**。
+- 辞書・Worker・WASM・voiceも同じバージョンの`dist/`から自動的に取得されるため、追加の設定は要らない。
+- unpkgでも同様に`https://unpkg.com/kokoro-js-jp@0.2.0`で解決される。
+- バージョンは固定すること。`@latest`は不変ではなく、jsDelivrのキャッシュ挙動も変わる。
+- この構成の実物が[デモページ](https://nerosui.github.io/kokoro-js-jp/)である(`demo/`はバンドラもimport mapも使わない静的3ファイル)。
+
+### npmからインストールする
+
+バンドラを使う場合は、`kokoro-js`をexternalのまま残した`dist/index.js`(`package.json`の`exports`)が解決される:
 
 ```bash
 npm install kokoro-js-jp
@@ -62,22 +95,22 @@ const englishAudio = await tts.speak("Hello, world.", "af_heart");
 const japaneseAudio = await tts.speak("こんにちは", "jf_alpha");
 ```
 
-- `japanese`を省略すると、このパッケージと同じバージョンへ固定されたjsDelivrの`dist/`を自動的に使用する。`0.1.1`では`https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.1/dist`となる。
+- `japanese`を省略すると、このパッケージと同じバージョンへ固定されたjsDelivrの`dist/`を自動的に使用する。`0.2.0`では`https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.2.0/dist`となる。
 - jsDelivrのWorkerは同一オリジンのBlob Workerから読み込む。厳格なCSPを使う場合は`worker-src blob:`と`script-src https://cdn.jsdelivr.net`、辞書・WASM・voice用に`connect-src https://cdn.jsdelivr.net`を許可するか、下記の自己ホスト方式を使う。
 - 辞書・Worker・WASM・voiceは日本語voiceIdを初めて使うまで取得されないため、英語のみの利用では追加ダウンロードやOpen JTalk Workerの生成は発生しない。日本語を明示的に無効化する場合は`japanese: false`を指定できる。
 - このパッケージはブラウザ専用である。SSRフレームワークではClient Componentまたはブラウザ側のコードからimportすること。モジュールのimport自体はWorkerを生成しないため、SSRビルド時の解析は可能。
 
 `voiceId`はkokoro-js本体と同じ、素のKokoro-82M voice idをそのまま使う(別名レイヤーは持たない)。1文字目が言語、2文字目が性別を表す:
 
-| 接頭辞 | 言語 | 性別 | 対応g2p |
-| --- | --- | --- | --- |
-| `af_` | 英語(米) | 女性 | ✅ espeak-ng(kokoro-js本体) |
-| `am_` | 英語(米) | 男性 | ✅ espeak-ng(kokoro-js本体) |
-| `bf_` | 英語(英) | 女性 | ✅ espeak-ng(kokoro-js本体) |
-| `bm_` | 英語(英) | 男性 | ✅ espeak-ng(kokoro-js本体) |
-| `jf_` | 日本語 | 女性 | ✅ Open JTalk(本パッケージ独自) |
-| `jm_` | 日本語 | 男性 | ✅ Open JTalk(本パッケージ独自) |
-| `e`/`f`/`h`/`i`/`p`/`z` 系 | 西語/仏語/ヒンディー語/伊語/ポルトガル語/中国語 | — | ❌ 対応g2pなし |
+| 接頭辞                     | 言語                                            | 性別 | 対応g2p                         |
+| -------------------------- | ----------------------------------------------- | ---- | ------------------------------- |
+| `af_`                      | 英語(米)                                        | 女性 | ✅ espeak-ng(kokoro-js本体)     |
+| `am_`                      | 英語(米)                                        | 男性 | ✅ espeak-ng(kokoro-js本体)     |
+| `bf_`                      | 英語(英)                                        | 女性 | ✅ espeak-ng(kokoro-js本体)     |
+| `bm_`                      | 英語(英)                                        | 男性 | ✅ espeak-ng(kokoro-js本体)     |
+| `jf_`                      | 日本語                                          | 女性 | ✅ Open JTalk(本パッケージ独自) |
+| `jm_`                      | 日本語                                          | 男性 | ✅ Open JTalk(本パッケージ独自) |
+| `e`/`f`/`h`/`i`/`p`/`z` 系 | 西語/仏語/ヒンディー語/伊語/ポルトガル語/中国語 | —    | ❌ 対応g2pなし                  |
 
 Kokoro-82Mモデル自体は非対応言語のvoiceも同梱しているが、対応するg2pが無いため`resolveLang()`は`undefined`を返し、`speak()`は例外を投げる。
 
@@ -115,14 +148,14 @@ const tts = await KokoroJP.load({
 
 ## スクリプト
 
-| コマンド | 説明 |
-| --- | --- |
-| `npm run build` | コードをバンドルした後、Worker/WASM、SHA-256検証済みのOpen JTalk公式辞書tar.gz(約24MB)、デフォルトHTSボイスを`dist/`へ配置する。展開済み辞書はnpmへ重複収録しない |
-| `npx kokoro-js-jp-copy-assets <public-directory>` | 自己ホスト用に辞書tar.gz・HTS voice・Worker・WASMをconsumerアプリのpublicディレクトリへコピーする |
-| `npm run format` | `prettier --write .`(kokoro-jsと同じ`--print-width 1000`) |
-| `npm test` | `vitest run`(g2p・ボイステーブルの純粋関数テストのみ。ブラウザ/WASMは絡まない) |
-| `npm run test:e2e` | `playwright test`(実ブラウザでWorker + WASM + ONNXパイプラインを実行するe2eテスト。要`npm run build`済み・`npx playwright install chromium`済み。詳細は[テスト](#テスト)節参照) |
-| `npm run typecheck` | `tsc --noEmit` |
+| コマンド                                          | 説明                                                                                                                                                                                                                       |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run build`                                   | npm向け(`dist/index.js`)とCDN向け(`dist/kokoro-jp.web.js`)の2つをバンドルした後、Worker/WASM、SHA-256検証済みのOpen JTalk公式辞書tar.gz(約24MB)、デフォルトHTSボイスを`dist/`へ配置する。展開済み辞書はnpmへ重複収録しない |
+| `npx kokoro-js-jp-copy-assets <public-directory>` | 自己ホスト用に辞書tar.gz・HTS voice・Worker・WASMをconsumerアプリのpublicディレクトリへコピーする                                                                                                                          |
+| `npm run format`                                  | `prettier --write .`(kokoro-jsと同じ`--print-width 1000`)                                                                                                                                                                  |
+| `npm test`                                        | `vitest run`(g2p・ボイステーブルの純粋関数テストのみ。ブラウザ/WASMは絡まない)                                                                                                                                             |
+| `npm run test:e2e`                                | `playwright test`(実ブラウザでWorker + WASM + ONNXパイプラインを実行するe2eテスト。要`npm run build`済み・`npx playwright install chromium`済み。詳細は[テスト](#テスト)節参照)                                            |
+| `npm run typecheck`                               | `tsc --noEmit`                                                                                                                                                                                                             |
 
 ## テスト
 
@@ -136,7 +169,7 @@ npm run test:e2e
 
 初回実行はKokoro-82M ONNXモデル(`dtype: "q4"`、最小量子化)をHugging Face Hubからダウンロードするため数分かかることがある。
 
-詳細な手順・デバッグ方法・既知の落とし穴(ビルド後の`dist/index.js`が`kokoro-js`をbare importする関係で、素のブラウザ実行にはimport mapが必要、等)は[`AGENTS.md`](AGENTS.md)を参照(メンテナ・エージェント向けの開発者向けドキュメントで、Claude Code連携(`.claude/`配下のサブエージェント・スキル)もそちらに記載している)。
+詳細な手順・デバッグ方法・既知の落とし穴(ビルド後の`dist/index.js`が`kokoro-js`をbare importする関係で、これを素のブラウザで直接実行する場合はimport mapが必要——CDNエントリ`dist/kokoro-jp.web.js`側は不要、等)は[`AGENTS.md`](AGENTS.md)を参照(メンテナ・エージェント向けの開発者向けドキュメントで、Claude Code連携(`.claude/`配下のサブエージェント・スキル)もそちらに記載している)。
 
 ## 既知の制限
 
@@ -150,10 +183,10 @@ Apache-2.0(kokoro-js本体、および本パッケージがportしている misa
 
 ## パッケージサイズについて
 
-展開済み辞書(約107MB)はnpmパッケージへ収録せず、公式辞書アーカイブ`dist/open_jtalk_dic_utf_8-1.11.tar.gz`(約24MB)のみを収録する。Worker/WASM・voice・コードを含むnpmパッケージ全体は約25MBである。公開後はバージョンを固定した次のjsDelivr URLからCORS付きで取得できる:
+展開済み辞書(約107MB)はnpmパッケージへ収録せず、公式辞書アーカイブ`dist/open_jtalk_dic_utf_8-1.11.tar.gz`(約24MB)のみを収録する。Worker/WASM・voice・コード(CDN向けの自己完結ビルド約2.1MBを含む)を合わせたnpmパッケージ全体は展開後で約27MB(tarballは約25MB)である。公開後はバージョンを固定した次のjsDelivr URLからCORS付きで取得できる:
 
 ```text
-https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.1.1/dist/open_jtalk_dic_utf_8-1.11.tar.gz
+https://cdn.jsdelivr.net/npm/kokoro-js-jp@0.2.0/dist/open_jtalk_dic_utf_8-1.11.tar.gz
 ```
 
 ブラウザWorkerはtar.gzのSHA-256とtarヘッダーを検証しながらgzipをストリーミング展開し、必要な8ファイルをWASMのファイルシステムへ直接書き込む。約107MBの展開済みtar全体をJavaScriptヒープへ保持しない。
